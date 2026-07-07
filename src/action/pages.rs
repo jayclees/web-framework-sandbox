@@ -62,7 +62,7 @@ pub struct ShowHtml;
 #[async_trait]
 impl Action for ShowHtml {
     async fn handle(&self, app: &App) -> Box<dyn Responsable> {
-        let template = app.template().get_template("example").unwrap();
+        let template = app.template().get_template("landing.html").unwrap();
         let result = template.render(ExampleStruct {
             app_title: "Bus Web Framework".to_string(),
             name: "John Doe".to_string(),

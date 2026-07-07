@@ -2,8 +2,8 @@ mod action;
 mod app;
 mod router;
 
-use crate::action::pages::{ShowHtml, ShowLanding};
 use crate::action::pages::{ShowAbout, ShowJson, ShowNumberArray};
+use crate::action::pages::{ShowHtml, ShowLanding};
 use crate::app::App;
 use crate::router::{Route, Router};
 use http_body_util::Full;
@@ -13,11 +13,12 @@ use hyper::service::service_fn;
 use hyper::{Request, Response};
 use hyper_util::rt::TokioIo;
 use hyper_util::server::conn::auto;
-use minijinja::Environment;
+use minijinja::{Environment, path_loader};
 use std::error::Error;
 use std::fs;
 use std::future::Future;
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 /// Future executor that utilises `tokio` threads.
@@ -52,8 +53,9 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     router.add(Route::new("/html", Box::new(ShowHtml)));
 
     let mut env = Environment::new();
-    let string = fs::read_to_string("resources/templates/example.html")?;
-    env.add_template_owned("example", string)?;
+    env.set_loader(path_loader(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resource/template"),
+    ));
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     let app = App::new(router, addr, env).await;
