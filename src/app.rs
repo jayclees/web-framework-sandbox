@@ -1,66 +1,56 @@
-use crate::TokioExecutor;
 use crate::router::Router;
 use http_body_util::Full;
 use hyper::body::{Bytes, Incoming};
-use hyper::service::service_fn;
 use hyper::{Request, Response};
-use hyper_util::rt::TokioIo;
-use hyper_util::server::conn::auto;
+use minijinja::Environment;
+use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 
-pub struct App {
+pub struct App<'a> {
     router: Arc<Router>,
-    listener: Option<TcpListener>,
+    listener: TcpListener,
+    template: Environment<'a>,
 }
 
-impl App {
-    pub fn new(router: Router) -> App {
+impl<'a> App<'a> {
+    pub async fn new(router: Router, addr: SocketAddr) -> App<'a> {
         App {
             router: Arc::new(router),
-            listener: None,
+            listener: TcpListener::bind(addr).await.unwrap(),
+            template: Environment::new(),
         }
     }
 
-    pub async fn run(
-        &mut self,
-        addr: SocketAddr,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        self.listener = Some(TcpListener::bind(addr).await.unwrap());
-        loop {
-            let (stream, _) = self.listener.as_ref().unwrap().accept().await?;
+    pub fn listener(&self) -> &TcpListener {
+        &self.listener
+    }
 
-            // Use an adapter to access something implementing `tokio::io` traits as if they implement
-            // `hyper::rt` IO traits.
-            let io = TokioIo::new(stream);
-            let router = Arc::clone(&self.router);
+    // pub async fn run(
+    //     &mut self,
+    //     addr: SocketAddr,
+    // ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    //     self.listener = Some(TcpListener::bind(addr).await.unwrap());
+    //
+    //     let app = Arc::new(&self);
+    //
+    //
+    // }
 
-            // Spawn a tokio task to serve multiple connections concurrently
-            tokio::task::spawn(async move {
-                // Finally, we bind the incoming connection to our `process` service
-                if let Err(err) = auto::Builder::new(TokioExecutor::new())
-                    // `service_fn` converts our function in a `Service`
-                    .serve_connection(
-                        io,
-                        service_fn(move |request: Request<Incoming>| {
-                            let router = Arc::clone(&router);
+    pub async fn dispatch(
+        &self,
+        request: Request<Incoming>,
+    ) -> Option<Result<Response<Full<Bytes>>, Infallible>> {
+        for route in &self.router.routes {
+            if route.path() == request.uri().path() {
+                let result = Some(route.action().handle().await.to_response());
 
-                            async move {
-                                router.dispatch(request).await.unwrap_or_else(|| {
-                                    Ok(Response::builder()
-                                        .status(404)
-                                        .body(Full::new(Bytes::from("Not Found")))
-                                        .unwrap())
-                                })
-                            }
-                        }),
-                    )
-                    .await
-                {
-                    eprintln!("Error serving connection: {:?}", err);
-                }
-            });
+                route.action().log().await;
+
+                return result;
+            }
         }
+        None
     }
 }
