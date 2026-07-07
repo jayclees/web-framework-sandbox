@@ -24,7 +24,7 @@ impl Router {
     ) -> Option<Result<Response<Full<Bytes>>, Infallible>> {
         for route in &self.routes {
             if route.path == request.uri().path() {
-                let result = Some(route.action.handle().await);
+                let result = Some(route.action.handle().await.to_response());
 
                 route.action.log().await;
 
