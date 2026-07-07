@@ -3,6 +3,7 @@ use http_body_util::Full;
 use hyper::Response;
 use hyper::body::Bytes;
 use std::convert::Infallible;
+use serde_json::Value;
 
 pub mod pages;
 
@@ -28,9 +29,33 @@ impl Responsable for String {
 
 impl Responsable for Vec<usize> {
     fn to_response(&self) -> Result<Response<Full<Bytes>>, Infallible> {
-        let builder1 = Response::builder().header("Content-Type", "application/json");
-        let result1 = serde_json::to_string(&self).unwrap();
-        let result = builder1.body(Full::new(Bytes::from(result1)));
-        Ok(result.unwrap())
+        let json = serde_json::to_string(&self).unwrap();
+
+        Ok(Response::builder()
+            .header("Content-Type", "application/json")
+            .body(Full::new(Bytes::from(json)))
+            .unwrap())
+    }
+}
+
+impl<const N: usize> Responsable for [usize; N] {
+    fn to_response(&self) -> Result<Response<Full<Bytes>>, Infallible> {
+        let json = serde_json::to_string(&self.to_vec()).unwrap();
+
+        Ok(Response::builder()
+            .header("Content-Type", "application/json")
+            .body(Full::new(Bytes::from(json)))
+            .unwrap())
+    }
+}
+
+impl Responsable for Value {
+    fn to_response(&self) -> Result<Response<Full<Bytes>>, Infallible> {
+        let json = serde_json::to_string(&self).unwrap();
+
+        Ok(Response::builder()
+            .header("Content-Type", "application/json")
+            .body(Full::new(Bytes::from(json)))
+            .unwrap())
     }
 }

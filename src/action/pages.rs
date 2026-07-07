@@ -1,5 +1,6 @@
 use crate::action::{Action, Responsable};
 use async_trait::async_trait;
+use serde_json::json;
 
 pub struct ShowLanding;
 
@@ -23,15 +24,33 @@ impl Action for ShowAbout {
     }
 }
 
-pub struct ShowJsonArray;
+pub struct ShowNumberArray;
 
 #[async_trait]
-impl Action for ShowJsonArray {
+impl Action for ShowNumberArray {
     async fn handle(&self) -> Box<dyn Responsable> {
-        // let mut vec = Vec::new();
-        // vec.push(1);
-        // vec.push(2);
-        // vec.push(3);
-        Box::new(vec![1, 2, 3, 4])
+        let mut vec = Vec::new();
+        vec.push(5);
+        Box::new(vec)
+        // Box::new([1, 2, 3, 4, 5])
+    }
+}
+
+pub struct ShowJson;
+
+#[async_trait]
+impl Action for ShowJson {
+    async fn handle(&self) -> Box<dyn Responsable> {
+        let full_name = "John Doe";
+        let age_last_year = 42;
+        let john = json!({
+            "name": full_name,
+            "age": age_last_year + 1,
+            "phones": [
+                format!("+44 {}", 123)
+            ]
+        });
+
+        Box::new(john)
     }
 }
