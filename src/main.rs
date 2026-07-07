@@ -2,7 +2,7 @@ mod action;
 mod app;
 mod router;
 
-use crate::action::pages::ShowAbout;
+use crate::action::pages::{ShowAbout, ShowJsonArray};
 use crate::action::pages::ShowLanding;
 use crate::app::App;
 use crate::router::{Route, Router};
@@ -35,8 +35,10 @@ where
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     let mut router = Router::new();
+
     router.add(Route::new("/", Box::new(ShowLanding)));
     router.add(Route::new("/about", Box::new(ShowAbout)));
+    router.add(Route::new("/json-array", Box::new(ShowJsonArray)));
 
     App::new(router)
         .run(SocketAddr::from(([127, 0, 0, 1], 3000)))

@@ -22,3 +22,16 @@ impl Action for ShowAbout {
         Box::new("About page".to_string())
     }
 }
+
+pub struct ShowJsonArray;
+
+#[async_trait]
+impl Action for ShowJsonArray {
+    async fn handle(&self) -> Box<dyn Responsable> {
+        // let mut vec = Vec::new();
+        // vec.push(1);
+        // vec.push(2);
+        // vec.push(3);
+        Box::new(vec![1, 2, 3, 4])
+    }
+}

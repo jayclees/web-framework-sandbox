@@ -28,8 +28,9 @@ impl Responsable for String {
 
 impl Responsable for Vec<usize> {
     fn to_response(&self) -> Result<Response<Full<Bytes>>, Infallible> {
-        let builder1 = Response::builder();
-        let result = builder1.body(Full::new(Bytes::from("test")));
+        let builder1 = Response::builder().header("Content-Type", "application/json");
+        let result1 = serde_json::to_string(&self).unwrap();
+        let result = builder1.body(Full::new(Bytes::from(result1)));
         Ok(result.unwrap())
     }
 }
