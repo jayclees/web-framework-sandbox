@@ -15,11 +15,11 @@ pub struct App<'a> {
 }
 
 impl<'a> App<'a> {
-    pub async fn new(router: Router, addr: SocketAddr) -> App<'a> {
+    pub async fn new(router: Router, addr: SocketAddr, env: Environment<'a>) -> App<'a> {
         App {
             router: Arc::new(router),
             listener: TcpListener::bind(addr).await.unwrap(),
-            template: Environment::new(),
+            template: env,
         }
     }
 
@@ -27,16 +27,9 @@ impl<'a> App<'a> {
         &self.listener
     }
 
-    // pub async fn run(
-    //     &mut self,
-    //     addr: SocketAddr,
-    // ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    //     self.listener = Some(TcpListener::bind(addr).await.unwrap());
-    //
-    //     let app = Arc::new(&self);
-    //
-    //
-    // }
+    pub fn template(&self) -> &Environment<'a> {
+        &self.template
+    }
 
     pub async fn dispatch(
         &self,
@@ -44,7 +37,7 @@ impl<'a> App<'a> {
     ) -> Option<Result<Response<Full<Bytes>>, Infallible>> {
         for route in &self.router.routes {
             if route.path() == request.uri().path() {
-                let result = Some(route.action().handle().await.to_response());
+                let result = Some(route.action().handle(&self).await.to_response());
 
                 route.action().log().await;
 

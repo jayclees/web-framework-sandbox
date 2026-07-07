@@ -1,12 +1,14 @@
 use crate::action::{Action, Responsable};
+use crate::app::App;
 use async_trait::async_trait;
+use serde::Serialize;
 use serde_json::json;
 
 pub struct ShowLanding;
 
 #[async_trait]
 impl Action for ShowLanding {
-    async fn handle(&self) -> Box<dyn Responsable> {
+    async fn handle(&self, _app: &App) -> Box<dyn Responsable> {
         Box::new("Home page".to_string())
     }
 
@@ -19,7 +21,7 @@ pub struct ShowAbout;
 
 #[async_trait]
 impl Action for ShowAbout {
-    async fn handle(&self) -> Box<dyn Responsable> {
+    async fn handle(&self, _app: &App) -> Box<dyn Responsable> {
         Box::new("About page".to_string())
     }
 }
@@ -28,7 +30,7 @@ pub struct ShowNumberArray;
 
 #[async_trait]
 impl Action for ShowNumberArray {
-    async fn handle(&self) -> Box<dyn Responsable> {
+    async fn handle(&self, _app: &App) -> Box<dyn Responsable> {
         let mut vec = Vec::new();
         vec.push(5);
         Box::new(vec)
@@ -40,7 +42,7 @@ pub struct ShowJson;
 
 #[async_trait]
 impl Action for ShowJson {
-    async fn handle(&self) -> Box<dyn Responsable> {
+    async fn handle(&self, _app: &App) -> Box<dyn Responsable> {
         let full_name = "John Doe";
         let age_last_year = 42;
         let john = json!({
@@ -53,4 +55,24 @@ impl Action for ShowJson {
 
         Box::new(john)
     }
+}
+
+pub struct ShowHtml;
+
+#[async_trait]
+impl Action for ShowHtml {
+    async fn handle(&self, app: &App) -> Box<dyn Responsable> {
+        let template = app.template().get_template("example").unwrap();
+        let result = template.render(ExampleStruct {
+            app_title: "Bus Web Framework".to_string(),
+            name: "John Doe".to_string(),
+        });
+        Box::new(result.unwrap())
+    }
+}
+
+#[derive(Serialize)]
+struct ExampleStruct {
+    app_title: String,
+    name: String,
 }

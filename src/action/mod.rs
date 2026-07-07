@@ -1,15 +1,16 @@
+use crate::app::App;
 use async_trait::async_trait;
 use http_body_util::Full;
 use hyper::Response;
 use hyper::body::Bytes;
-use std::convert::Infallible;
 use serde_json::Value;
+use std::convert::Infallible;
 
 pub mod pages;
 
 #[async_trait]
 pub trait Action {
-    async fn handle(&self) -> Box<dyn Responsable>;
+    async fn handle(&self, app: &App) -> Box<dyn Responsable>;
     async fn log(&self) -> () {
         // Do nothing
         println!("Doing nothing...")
