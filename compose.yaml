@@ -1,0 +1,12 @@
+services:
+
+  db:
+    image: mysql
+    restart: always
+    environment:
+      MYSQL_DATABASE: rusty
+      MYSQL_ROOT_PASSWORD: my_secret_password
+    hostname: db
+    container_name: db
+    domainname: db
+    # (this is just an example, not intended to be a production configuration)
