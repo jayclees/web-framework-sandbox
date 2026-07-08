@@ -1,28 +1,33 @@
+use crate::TokioExecutor;
 use crate::router::Router;
 use http_body_util::Full;
 use hyper::body::{Bytes, Incoming};
+use hyper::service::service_fn;
 use hyper::{Request, Response};
+use hyper_util::rt::TokioIo;
+use hyper_util::server::conn::auto;
 use minijinja::Environment;
 use sea_orm::DatabaseConnection;
 use std::convert::Infallible;
+use std::error::Error;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 
-pub struct App<'a> {
+pub struct App {
     router: Arc<Router>,
     listener: TcpListener,
-    template: Environment<'a>,
+    template: Environment<'static>,
     db: DatabaseConnection,
 }
 
-impl<'a> App<'a> {
+impl App {
     pub async fn new(
         router: Router,
         addr: SocketAddr,
-        env: Environment<'a>,
+        env: Environment<'static>,
         db: DatabaseConnection,
-    ) -> App<'a> {
+    ) -> App {
         App {
             router: Arc::new(router),
             listener: TcpListener::bind(addr).await.unwrap(),
@@ -35,8 +40,43 @@ impl<'a> App<'a> {
         &self.listener
     }
 
-    pub fn template(&self) -> &Environment<'a> {
+    pub fn template(&self) -> &Environment<'static> {
         &self.template
+    }
+
+    pub fn db(&self) -> &DatabaseConnection {
+        &self.db
+    }
+
+    pub async fn run(self: Arc<Self>) -> Result<(), Box<dyn Error + Send + Sync>> {
+        loop {
+            let (stream, _) = self.listener().accept().await?;
+            let io = TokioIo::new(stream);
+            let app = Arc::clone(&self);
+
+            tokio::task::spawn(async move {
+                if let Err(err) = auto::Builder::new(TokioExecutor::new())
+                    .serve_connection(
+                        io,
+                        service_fn(move |request: Request<Incoming>| {
+                            let app = Arc::clone(&app);
+
+                            async move {
+                                app.dispatch(request).await.unwrap_or_else(|| {
+                                    Ok(Response::builder()
+                                        .status(404)
+                                        .body(Full::new(Bytes::from("Not Found")))
+                                        .unwrap())
+                                })
+                            }
+                        }),
+                    )
+                    .await
+                {
+                    eprintln!("Error serving connection: {:?}", err);
+                }
+            });
+        }
     }
 
     pub async fn dispatch(
