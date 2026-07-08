@@ -1,10 +1,10 @@
 use crate::action::{Action, Responsable};
 use crate::app::App;
+use crate::entity::user::Entity as User;
 use async_trait::async_trait;
 use sea_orm::EntityTrait;
 use serde::Serialize;
 use serde_json::json;
-use crate::entity::user::Entity;
 
 pub struct ShowLanding;
 
@@ -79,13 +79,13 @@ struct ExampleStruct {
     name: String,
 }
 
-
 pub struct ShowDatabaseModel;
 
 #[async_trait]
 impl Action for ShowDatabaseModel {
     async fn handle(&self, app: &App) -> Box<dyn Responsable> {
-        let result = Entity::find_by_id(1).one(app.db()).await.unwrap().unwrap();
+        let connection = app.db().unwrap();
+        let result = User::find_by_id(1).one(connection).await.unwrap().unwrap();
         Box::new(json!(result))
     }
 }

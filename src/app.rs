@@ -18,7 +18,7 @@ pub struct App {
     router: Arc<Router>,
     listener: TcpListener,
     template: Environment<'static>,
-    db: DatabaseConnection,
+    db: Option<DatabaseConnection>,
 }
 
 impl App {
@@ -32,7 +32,7 @@ impl App {
             router: Arc::new(router),
             listener: TcpListener::bind(addr).await.unwrap(),
             template: env,
-            db,
+            db: Some(db),
         }
     }
 
@@ -44,8 +44,8 @@ impl App {
         &self.template
     }
 
-    pub fn db(&self) -> &DatabaseConnection {
-        &self.db
+    pub fn db(&self) -> Option<&DatabaseConnection> {
+        self.db.as_ref()
     }
 
     pub async fn run(self: Arc<Self>) -> Result<(), Box<dyn Error + Send + Sync>> {
