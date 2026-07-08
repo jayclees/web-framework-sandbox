@@ -3,6 +3,7 @@ use http_body_util::Full;
 use hyper::body::{Bytes, Incoming};
 use hyper::{Request, Response};
 use minijinja::Environment;
+use sea_orm::DatabaseConnection;
 use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -12,14 +13,21 @@ pub struct App<'a> {
     router: Arc<Router>,
     listener: TcpListener,
     template: Environment<'a>,
+    db: DatabaseConnection,
 }
 
 impl<'a> App<'a> {
-    pub async fn new(router: Router, addr: SocketAddr, env: Environment<'a>) -> App<'a> {
+    pub async fn new(
+        router: Router,
+        addr: SocketAddr,
+        env: Environment<'a>,
+        db: DatabaseConnection,
+    ) -> App<'a> {
         App {
             router: Arc::new(router),
             listener: TcpListener::bind(addr).await.unwrap(),
             template: env,
+            db,
         }
     }
 
