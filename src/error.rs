@@ -3,16 +3,16 @@ use std::fmt;
 
 #[derive(Debug)]
 pub struct HttpError {
-    code: i16,
+    code: u16,
     message: String,
 }
 
 impl HttpError {
-    pub fn new(code: i16, message: String) -> HttpError {
+    pub fn new(code: u16, message: String) -> HttpError {
         HttpError { code, message }
     }
 
-    pub fn code(&self) -> i16 {
+    pub fn code(&self) -> u16 {
         self.code
     }
 

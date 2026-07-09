@@ -67,7 +67,7 @@ impl App {
                                     Some(result) => {
                                         if let Err(err) = &result {
                                             return Ok(Response::builder()
-                                                .status(404)
+                                                .status(err.code())
                                                 .body(Full::new(Bytes::from(err.message())))
                                                 .unwrap())
                                         }
