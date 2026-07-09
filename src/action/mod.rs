@@ -1,35 +1,35 @@
 use crate::app::App;
+use crate::error::HttpError;
 use async_trait::async_trait;
 use http_body_util::Full;
 use hyper::Response;
 use hyper::body::Bytes;
 use serde_json::Value;
-use std::convert::Infallible;
 
 pub mod pages;
 
 #[async_trait]
 pub trait Action {
-    async fn handle(&self, app: &App) -> Box<dyn Responsable>;
+    async fn handle(&self, app: &App) -> Result<Box<dyn Responsable>, HttpError>;
     async fn log(&self) -> () {
         // Do nothing
         println!("Doing nothing...")
     }
 }
 
-pub trait Responsable {
-    fn to_response(&self) -> Result<Response<Full<Bytes>>, Infallible>;
+pub trait Responsable: Send {
+    fn to_response(&self) -> Result<Response<Full<Bytes>>, HttpError>;
 }
 
 impl Responsable for String {
-    fn to_response(&self) -> Result<Response<Full<Bytes>>, Infallible> {
+    fn to_response(&self) -> Result<Response<Full<Bytes>>, HttpError> {
         let slice = self.to_string();
         Ok(Response::new(Full::new(Bytes::from(slice))))
     }
 }
 
 impl Responsable for Vec<usize> {
-    fn to_response(&self) -> Result<Response<Full<Bytes>>, Infallible> {
+    fn to_response(&self) -> Result<Response<Full<Bytes>>, HttpError> {
         let json = serde_json::to_string(&self).unwrap();
 
         Ok(Response::builder()
@@ -40,7 +40,7 @@ impl Responsable for Vec<usize> {
 }
 
 impl<const N: usize> Responsable for [usize; N] {
-    fn to_response(&self) -> Result<Response<Full<Bytes>>, Infallible> {
+    fn to_response(&self) -> Result<Response<Full<Bytes>>, HttpError> {
         let json = serde_json::to_string(&self.to_vec()).unwrap();
 
         Ok(Response::builder()
@@ -51,7 +51,7 @@ impl<const N: usize> Responsable for [usize; N] {
 }
 
 impl Responsable for Value {
-    fn to_response(&self) -> Result<Response<Full<Bytes>>, Infallible> {
+    fn to_response(&self) -> Result<Response<Full<Bytes>>, HttpError> {
         let json = serde_json::to_string(&self).unwrap();
 
         Ok(Response::builder()

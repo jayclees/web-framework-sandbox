@@ -2,8 +2,9 @@ mod action;
 mod app;
 mod entity;
 mod router;
+mod error;
 
-use crate::action::pages::{ShowAbout, ShowDatabaseModel, ShowJson, ShowNumberArray};
+use crate::action::pages::{ShowAbout, ShowDatabaseModel, ShowErrorPage, ShowJson, ShowNumberArray};
 use crate::action::pages::{ShowHtml, ShowLanding};
 use crate::app::App;
 use crate::router::{Route, Router};
@@ -31,6 +32,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     router.add(Route::new("/json", Box::new(ShowJson)));
     router.add(Route::new("/html", Box::new(ShowHtml)));
     router.add(Route::new("/db-user", Box::new(ShowDatabaseModel)));
+    router.add(Route::new("/error", Box::new(ShowErrorPage)));
 
     let mut env = Environment::new();
     env.set_loader(path_loader(
