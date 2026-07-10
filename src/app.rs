@@ -72,7 +72,7 @@ impl App {
                                                 .unwrap());
                                         }
 
-                                        return result;
+                                        result
                                     }
                                     None => {
                                         Ok(Response::builder()

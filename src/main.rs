@@ -1,11 +1,11 @@
 mod action;
 mod app;
 mod entity;
-mod router;
 mod error;
 mod helper;
+mod router;
 
-use crate::action::pages::{ShowAbout, ShowUser, ShowErrorPage, ShowJson, ShowNumberArray};
+use crate::action::pages::{ShowAbout, ShowErrorPage, ShowJson, ShowNumberArray, ShowUser};
 use crate::action::pages::{ShowHtml, ShowLanding};
 use crate::app::App;
 use crate::router::{Route, Router};
@@ -50,7 +50,9 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         .sqlx_logging(false) // disable SQLx logging
         .sqlx_logging_level(log::LevelFilter::Info);
     let db = Database::connect(opt).await.unwrap();
-    db.get_schema_registry("my_crate::entity::*").sync(&db).await?;
+    db.get_schema_registry("my_crate::entity::*")
+        .sync(&db)
+        .await?;
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     let app = Arc::new(App::new(router, addr, env, db).await);

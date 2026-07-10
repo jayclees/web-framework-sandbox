@@ -1,3 +1,4 @@
+use std::fmt::{Debug, Formatter};
 use crate::app::App;
 use crate::error::HttpError;
 use async_trait::async_trait;
@@ -14,6 +15,12 @@ pub trait Action {
     async fn log(&self) -> () {
         // Do nothing
         println!("Doing nothing...")
+    }
+}
+
+impl Debug for dyn Action {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        std::fmt::write(f, format_args!(""))
     }
 }
 
