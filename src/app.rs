@@ -9,6 +9,7 @@ use hyper_util::rt::TokioIo;
 use hyper_util::server::conn::auto;
 use minijinja::Environment;
 use sea_orm::DatabaseConnection;
+use serde_json::json;
 use std::error::Error;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -60,12 +61,32 @@ impl App {
                         io,
                         service_fn(move |request: Request<Incoming>| {
                             let app = Arc::clone(&app);
+                            let wants_json = if let Some(accepts) = request.headers().get("Accept")
+                            {
+                                Some(accepts == "application/json")
+                            } else {
+                                None
+                            };
 
                             async move {
-                                let option = app.dispatch(request).await;
+                                let option = app.dispatch(&request).await;
                                 match option {
                                     Some(result) => {
                                         if let Err(err) = &result {
+                                            if wants_json.unwrap_or(false) {
+                                                return Ok(Response::builder()
+                                                    .status(err.code())
+                                                    .header("Content-Type", "application/json")
+                                                    .body(Full::new(Bytes::from(
+                                                        json!({
+                                                            "code": err.code(),
+                                                            "message": err.message(),
+                                                        })
+                                                        .to_string(),
+                                                    )))
+                                                    .unwrap());
+                                            }
+
                                             return Ok(Response::builder()
                                                 .status(err.code())
                                                 .body(Full::new(Bytes::from(err.message())))
@@ -75,9 +96,24 @@ impl App {
                                         result
                                     }
                                     None => {
+                                        // if response wants JSON or is api route, return JSON
+                                        // else, check config for error templates, return that
+                                        if wants_json.unwrap_or(false) {
+                                            return Ok(Response::builder()
+                                                .status(404)
+                                                .header("Content-Type", "application/json")
+                                                .body(Full::new(Bytes::from(
+                                                    json!({
+                                                        "code": 404,
+                                                        "message": "Endpoint not found."
+                                                    })
+                                                    .to_string(),
+                                                )))
+                                                .unwrap());
+                                        }
+
                                         Ok(Response::builder()
                                             .status(404)
-                                            // todo: if api route, return endpoint not found
                                             .body(Full::new(Bytes::from("Page not found.")))
                                             .unwrap())
                                     }
@@ -95,7 +131,7 @@ impl App {
 
     pub async fn dispatch(
         &self,
-        request: Request<Incoming>,
+        request: &Request<Incoming>,
     ) -> Option<Result<Response<Full<Bytes>>, HttpError>> {
         let route = &self.router.resolve(request.uri().path())?;
 

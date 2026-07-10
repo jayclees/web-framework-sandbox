@@ -95,9 +95,10 @@ pub struct ShowErrorPage;
 #[async_trait]
 impl Action for ShowErrorPage {
     async fn handle(&self, _app: &App) -> Result<Box<dyn Responsable>, HttpError> {
+        let code = 400;
         Err(HttpError::new(
-            400,
-            "Error with request. Please change request and try again.".into(),
+            code,
+            format!("Error ({}). Please change request and try again.", code),
         ))
     }
 }
