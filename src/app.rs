@@ -77,64 +77,7 @@ pub async fn run(app: Arc<App>) -> Result<(), Box<dyn Error + Send + Sync>> {
                 .serve_connection(
                     io,
                     service_fn(move |request: Request<Incoming>| {
-                        let app = Arc::clone(&app);
-                        let wants_json = if let Some(accepts) = request.headers().get("Accept") {
-                            Some(accepts == "application/json")
-                        } else {
-                            None
-                        };
-
-                        async move {
-                            let option = app.dispatch(&request).await;
-                            match option {
-                                Some(result) => {
-                                    if let Err(err) = &result {
-                                        if wants_json.unwrap_or(false) {
-                                            return Ok(Response::builder()
-                                                .status(err.code())
-                                                .header("Content-Type", "application/json")
-                                                .body(Full::new(Bytes::from(
-                                                    json!({
-                                                        "code": err.code(),
-                                                        "message": err.message(),
-                                                    })
-                                                    .to_string(),
-                                                )))
-                                                .unwrap());
-                                        }
-
-                                        return Ok(Response::builder()
-                                            .status(err.code())
-                                            .body(Full::new(Bytes::from(err.message())))
-                                            .unwrap());
-                                    }
-
-                                    result
-                                }
-                                None => {
-                                    // if response wants JSON or is api route, return JSON
-                                    // else, check config for error templates, return that
-                                    if wants_json.unwrap_or(false) {
-                                        return Ok(Response::builder()
-                                            .status(404)
-                                            .header("Content-Type", "application/json")
-                                            .body(Full::new(Bytes::from(
-                                                json!({
-                                                    "code": 404,
-                                                    "message": "Endpoint not found."
-                                                })
-                                                .to_string(),
-                                            )))
-                                            .unwrap());
-                                    }
-
-                                    Ok(Response::builder()
-                                        .status(404)
-                                        .body(Full::new(Bytes::from("Page not found.")))
-                                        .unwrap())
-                                }
-                            }
-                        }
+                        handle_request(Arc::clone(&app), request)
                     }),
                 )
                 .await
@@ -142,5 +85,66 @@ pub async fn run(app: Arc<App>) -> Result<(), Box<dyn Error + Send + Sync>> {
                 eprintln!("Error serving connection: {:?}", err);
             }
         });
+    }
+}
+
+async fn handle_request(
+    app: Arc<App>,
+    request: Request<Incoming>,
+) -> Result<Response<Full<Bytes>>, HttpError> {
+    let wants_json = if let Some(accepts) = request.headers().get("Accept") {
+        Some(accepts == "application/json")
+    } else {
+        None
+    };
+
+    let option = app.dispatch(&request).await;
+    match option {
+        Some(result) => {
+            if let Err(err) = &result {
+                if wants_json.unwrap_or(false) {
+                    return Ok(Response::builder()
+                        .status(err.code())
+                        .header("Content-Type", "application/json")
+                        .body(Full::new(Bytes::from(
+                            json!({
+                                "code": err.code(),
+                                "message": err.message(),
+                            })
+                            .to_string(),
+                        )))
+                        .unwrap());
+                }
+
+                return Ok(Response::builder()
+                    .status(err.code())
+                    .body(Full::new(Bytes::from(err.message())))
+                    .unwrap());
+            }
+
+            result
+        }
+        None => {
+            // if response wants JSON or is api route, return JSON
+            // else, check config for error templates, return that
+            if wants_json.unwrap_or(false) {
+                return Ok(Response::builder()
+                    .status(404)
+                    .header("Content-Type", "application/json")
+                    .body(Full::new(Bytes::from(
+                        json!({
+                            "code": 404,
+                            "message": "Endpoint not found."
+                        })
+                        .to_string(),
+                    )))
+                    .unwrap());
+            }
+
+            Ok(Response::builder()
+                .status(404)
+                .body(Full::new(Bytes::from("Page not found.")))
+                .unwrap())
+        }
     }
 }
