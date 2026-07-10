@@ -10,7 +10,7 @@ use crate::action::pages::{ShowHtml, ShowLanding};
 use crate::app::App;
 use crate::router::{Route, Router};
 use hyper::rt::Executor;
-use minijinja::{Environment, path_loader};
+use minijinja::{path_loader, Environment};
 use sea_orm::{ConnectOptions, Database};
 use std::env;
 use std::error::Error;

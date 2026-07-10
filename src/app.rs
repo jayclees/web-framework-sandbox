@@ -1,6 +1,6 @@
-use crate::TokioExecutor;
 use crate::error::HttpError;
 use crate::router::Router;
+use crate::TokioExecutor;
 use http_body_util::Full;
 use hyper::body::{Bytes, Incoming};
 use hyper::service::service_fn;

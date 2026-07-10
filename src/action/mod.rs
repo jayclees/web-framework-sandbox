@@ -1,11 +1,11 @@
-use std::fmt::{Debug, Formatter};
 use crate::app::App;
 use crate::error::HttpError;
 use async_trait::async_trait;
 use http_body_util::Full;
-use hyper::Response;
 use hyper::body::Bytes;
+use hyper::Response;
 use serde_json::Value;
+use std::fmt::{Debug, Formatter};
 
 pub mod pages;
 

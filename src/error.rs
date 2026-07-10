@@ -27,6 +27,4 @@ impl fmt::Display for HttpError {
     }
 }
 
-impl Error for HttpError {
-
-}
+impl Error for HttpError {}
