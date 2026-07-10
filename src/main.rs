@@ -3,8 +3,9 @@ mod app;
 mod entity;
 mod router;
 mod error;
+mod helper;
 
-use crate::action::pages::{ShowAbout, ShowDatabaseModel, ShowErrorPage, ShowJson, ShowNumberArray};
+use crate::action::pages::{ShowAbout, ShowUser, ShowErrorPage, ShowJson, ShowNumberArray};
 use crate::action::pages::{ShowHtml, ShowLanding};
 use crate::app::App;
 use crate::router::{Route, Router};
@@ -26,13 +27,13 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
 
     let mut router = Router::new();
 
-    router.add(Route::new("/", Box::new(ShowLanding)));
-    router.add(Route::new("/about", Box::new(ShowAbout)));
-    router.add(Route::new("/json-array", Box::new(ShowNumberArray)));
-    router.add(Route::new("/json", Box::new(ShowJson)));
-    router.add(Route::new("/html", Box::new(ShowHtml)));
-    router.add(Route::new("/db-user", Box::new(ShowDatabaseModel)));
-    router.add(Route::new("/error", Box::new(ShowErrorPage)));
+    router.add(Route::get("/", Box::new(ShowLanding)));
+    router.add(Route::get("/about", Box::new(ShowAbout)));
+    router.add(Route::get("/json-array", Box::new(ShowNumberArray)));
+    router.add(Route::get("/json", Box::new(ShowJson)));
+    router.add(Route::get("/html", Box::new(ShowHtml)));
+    router.add(Route::get("/user/{user}", Box::new(ShowUser)));
+    router.add(Route::get("/error", Box::new(ShowErrorPage)));
 
     let mut env = Environment::new();
     env.set_loader(path_loader(
@@ -49,6 +50,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         .sqlx_logging(false) // disable SQLx logging
         .sqlx_logging_level(log::LevelFilter::Info);
     let db = Database::connect(opt).await.unwrap();
+    db.get_schema_registry("my_crate::entity::*").sync(&db).await?;
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     let app = Arc::new(App::new(router, addr, env, db).await);

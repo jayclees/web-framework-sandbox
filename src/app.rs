@@ -69,7 +69,7 @@ impl App {
                                             return Ok(Response::builder()
                                                 .status(err.code())
                                                 .body(Full::new(Bytes::from(err.message())))
-                                                .unwrap())
+                                                .unwrap());
                                         }
 
                                         return result;
@@ -97,18 +97,15 @@ impl App {
         &self,
         request: Request<Incoming>,
     ) -> Option<Result<Response<Full<Bytes>>, HttpError>> {
-        for route in &self.router.routes {
-            if route.path() == request.uri().path() {
-                return match route.action().handle(&self).await {
-                    Ok(result) => {
-                        route.action().log().await;
+        let route = &self.router.resolve(request.uri().path())?;
 
-                        Some(result.to_response())
-                    }
-                    Err(e) => Some(Err(e)),
-                }
+        match route.action().handle(&self).await {
+            Ok(result) => {
+                route.action().log().await;
+
+                Some(result.to_response())
             }
+            Err(e) => Some(Err(e)),
         }
-        None
     }
 }

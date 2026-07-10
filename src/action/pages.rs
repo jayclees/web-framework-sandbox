@@ -79,10 +79,10 @@ struct ExampleStruct {
     name: String,
 }
 
-pub struct ShowDatabaseModel;
+pub struct ShowUser;
 
 #[async_trait]
-impl Action for ShowDatabaseModel {
+impl Action for ShowUser {
     async fn handle(&self, app: &App) -> Result<Box<dyn Responsable>, HttpError> {
         let connection = app.db().unwrap();
         let result = User::find_by_id(1).one(connection).await.unwrap().unwrap();

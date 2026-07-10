@@ -13,7 +13,7 @@ impl MigrationTrait for Migration {
                     .if_not_exists()
                     .col(pk_auto("id"))
                     .col(string("name"))
-                    .col(string("text"))
+                    .col(string("bio"))
                     .to_owned(),
             )
             .await

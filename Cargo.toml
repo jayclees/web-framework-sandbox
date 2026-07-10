@@ -12,10 +12,11 @@ async-trait = "0.1.89"
 serde_json = "1.0.150"
 minijinja = "2.21.0"
 serde = { version = "1.0.228", features = ["derive"] }
-sea-orm = { version = "2.0.0-rc", features = [ "sqlx-mysql", "runtime-tokio-native-tls", "macros" ] }
+sea-orm = { version = "2.0.0-rc", features = ["sqlx-mysql", "runtime-tokio-native-tls", "macros", "entity-registry"] }
 migration = { path = "migration" }
 dotenvy = "0.15.7"
 log = "0.4.33"
+regex = "1.13.0"
 
 [workspace]
 members = [".", "migration"]
