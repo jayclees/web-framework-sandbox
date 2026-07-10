@@ -141,6 +141,8 @@ fn error_response(
     if json {
         builder = builder.header("Content-Type", "application/json");
     }
+    // todo check if error templates available, if so, return the error template
+    // todo check if app is local/debug is enabled, send stack trace to browser if so
 
     Ok(builder.body(Full::new(Bytes::from(message))).unwrap())
 }

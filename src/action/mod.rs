@@ -5,22 +5,16 @@ use http_body_util::Full;
 use hyper::body::Bytes;
 use hyper::Response;
 use serde_json::Value;
-use std::fmt::{Debug, Formatter};
+use std::fmt::Debug;
 
 pub mod pages;
 
 #[async_trait]
-pub trait Action {
+pub trait Action: Send + Sync + Debug {
     async fn handle(&self, app: &App) -> Result<Box<dyn Responsable>, HttpError>;
     async fn log(&self) -> () {
         // Do nothing
         println!("Doing nothing...")
-    }
-}
-
-impl Debug for dyn Action {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        std::fmt::write(f, format_args!(""))
     }
 }
 

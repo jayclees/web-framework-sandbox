@@ -7,6 +7,7 @@ use sea_orm::EntityTrait;
 use serde::Serialize;
 use serde_json::json;
 
+#[derive(Debug)]
 pub struct ShowLanding;
 
 #[async_trait]
@@ -19,6 +20,7 @@ impl Action for ShowLanding {
     //     println!("Logging first time visitor...")
     // }
 }
+#[derive(Debug)]
 
 pub struct ShowAbout;
 
@@ -28,6 +30,7 @@ impl Action for ShowAbout {
         Ok(Box::new("About page".to_string()))
     }
 }
+#[derive(Debug)]
 
 pub struct ShowNumberArray;
 
@@ -39,6 +42,7 @@ impl Action for ShowNumberArray {
         Ok(Box::new(vec))
     }
 }
+#[derive(Debug)]
 
 pub struct ShowJson;
 
@@ -58,6 +62,7 @@ impl Action for ShowJson {
         Ok(Box::new(john))
     }
 }
+#[derive(Debug)]
 
 pub struct ShowHtml;
 
@@ -79,6 +84,7 @@ struct ExampleStruct {
     name: String,
 }
 
+#[derive(Debug)]
 pub struct ShowUser;
 
 #[async_trait]
@@ -90,6 +96,7 @@ impl Action for ShowUser {
     }
 }
 
+#[derive(Debug)]
 pub struct ShowErrorPage;
 
 #[async_trait]

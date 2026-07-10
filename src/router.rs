@@ -2,6 +2,10 @@ use crate::action::Action;
 use regex::Regex;
 use std::sync::LazyLock;
 
+static REG: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\{[^_][a-zA-Z0-9_]*[a-zA-Z0-9]}").unwrap());
+
+#[derive(Debug)]
 pub struct Router {
     pub routes: Vec<Route>,
 }
@@ -30,16 +34,9 @@ impl Router {
     }
 }
 
-enum PathPart {
-    String(&'static str),
-    Variable(&'static str, Vec<&'static str>),
-    ModelId(&'static str),
-    // regular string path
-    // model string name
-}
-
 type ActionType = Box<dyn Action + Send + Sync>;
 
+#[derive(Debug)]
 pub struct Route {
     method: &'static str,
     path: &'static str,
@@ -52,7 +49,7 @@ impl Route {
         Route {
             method,
             path,
-            path_parts: Self::split_parts(path),
+            path_parts: split_parts(path),
             action,
         }
     }
@@ -61,7 +58,7 @@ impl Route {
         Route {
             method: "get",
             path,
-            path_parts: Self::split_parts(path),
+            path_parts: split_parts(path),
             action,
         }
     }
@@ -70,7 +67,7 @@ impl Route {
         Route {
             method: "post",
             path,
-            path_parts: Self::split_parts(path),
+            path_parts: split_parts(path),
             action,
         }
     }
@@ -79,7 +76,7 @@ impl Route {
         Route {
             method: "patch",
             path,
-            path_parts: Self::split_parts(path),
+            path_parts: split_parts(path),
             action,
         }
     }
@@ -88,7 +85,7 @@ impl Route {
         Route {
             method: "put",
             path,
-            path_parts: Self::split_parts(path),
+            path_parts: split_parts(path),
             action,
         }
     }
@@ -97,7 +94,7 @@ impl Route {
         Route {
             method: "delete",
             path,
-            path_parts: Self::split_parts(path),
+            path_parts: split_parts(path),
             action,
         }
     }
@@ -106,7 +103,7 @@ impl Route {
         Route {
             method: "head",
             path,
-            path_parts: Self::split_parts(path),
+            path_parts: split_parts(path),
             action,
         }
     }
@@ -115,7 +112,7 @@ impl Route {
         Route {
             method: "connect",
             path,
-            path_parts: Self::split_parts(path),
+            path_parts: split_parts(path),
             action,
         }
     }
@@ -124,7 +121,7 @@ impl Route {
         Route {
             method: "options",
             path,
-            path_parts: Self::split_parts(path),
+            path_parts: split_parts(path),
             action,
         }
     }
@@ -133,7 +130,7 @@ impl Route {
         Route {
             method: "trace",
             path,
-            path_parts: Self::split_parts(path),
+            path_parts: split_parts(path),
             action,
         }
     }
@@ -146,30 +143,6 @@ impl Route {
         &self.action
     }
 
-    fn split_parts(path: &'static str) -> Vec<PathPart> {
-        let mut result = Vec::new();
-        let parts = path.split("/");
-
-        for part in parts.into_iter() {
-            result.push(Self::part_type(part));
-        }
-
-        result
-    }
-
-    fn part_type(part: &'static str) -> PathPart {
-        // todo: avoid recompiling regex every time
-        static REG: LazyLock<Regex> =
-            LazyLock::new(|| Regex::new(r"\{[^_][a-zA-Z0-9_]*[a-zA-Z0-9]}").unwrap());
-        let matches: Vec<&str> = REG.find_iter(part).map(|m| m.as_str()).collect();
-
-        if matches.len() == 0 {
-            return PathPart::String(part);
-        }
-
-        PathPart::Variable(part, matches)
-    }
-
     fn is_variable(part: &str) -> bool {
         todo!()
     }
@@ -177,4 +150,34 @@ impl Route {
     fn is_model(part: &str) -> bool {
         todo!()
     }
+}
+
+#[derive(Debug)]
+enum PathPart {
+    String(&'static str),
+    Variable(&'static str, Vec<&'static str>),
+    ModelId(&'static str),
+    // regular string path
+    // model string name
+}
+
+fn split_parts(path: &'static str) -> Vec<PathPart> {
+    let mut result = Vec::new();
+    let parts = path.split("/");
+
+    for part in parts.into_iter() {
+        result.push(part_type(part));
+    }
+
+    result
+}
+
+fn part_type(part: &'static str) -> PathPart {
+    let matches: Vec<&str> = REG.find_iter(part).map(|m| m.as_str()).collect();
+
+    if matches.len() == 0 {
+        return PathPart::String(part);
+    }
+
+    PathPart::Variable(part, matches)
 }

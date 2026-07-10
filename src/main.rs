@@ -42,7 +42,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         .sqlx_logging(false) // disable SQLx logging
         .sqlx_logging_level(log::LevelFilter::Info);
     let db = Database::connect(opt).await.unwrap();
-    db.get_schema_registry("my_crate::entity::*")
+    db.get_schema_registry("bus_pattern_framework::entity::*")
         .sync(&db)
         .await?;
 
