@@ -103,23 +103,14 @@ async fn handle_request(
         Some(result) => {
             if let Err(err) = &result {
                 if wants_json.unwrap_or(false) {
-                    return Ok(Response::builder()
-                        .status(err.code())
-                        .header("Content-Type", "application/json")
-                        .body(Full::new(Bytes::from(
-                            json!({
-                                "code": err.code(),
-                                "message": err.message(),
-                            })
-                            .to_string(),
-                        )))
-                        .unwrap());
+                    let json = json!({
+                        "code": err.code(),
+                        "message": err.message(),
+                    });
+                    return error_response(err.code(), json.to_string(), true);
                 }
 
-                return Ok(Response::builder()
-                    .status(err.code())
-                    .body(Full::new(Bytes::from(err.message())))
-                    .unwrap());
+                return error_response(err.code(), err.message(), false);
             }
 
             result
@@ -128,23 +119,28 @@ async fn handle_request(
             // if response wants JSON or is api route, return JSON
             // else, check config for error templates, return that
             if wants_json.unwrap_or(false) {
-                return Ok(Response::builder()
-                    .status(404)
-                    .header("Content-Type", "application/json")
-                    .body(Full::new(Bytes::from(
-                        json!({
-                            "code": 404,
-                            "message": "Endpoint not found."
-                        })
-                        .to_string(),
-                    )))
-                    .unwrap());
+                let json = json!({
+                    "code": 404,
+                    "message": "Endpoint not found."
+                });
+                return error_response(404, json.to_string(), true);
             }
 
-            Ok(Response::builder()
-                .status(404)
-                .body(Full::new(Bytes::from("Page not found.")))
-                .unwrap())
+            error_response(404, "Page not found.".to_string(), false)
         }
     }
+}
+
+fn error_response(
+    code: u16,
+    message: String,
+    json: bool,
+) -> Result<Response<Full<Bytes>>, HttpError> {
+    let mut builder = Response::builder().status(code);
+
+    if json {
+        builder = builder.header("Content-Type", "application/json");
+    }
+
+    Ok(builder.body(Full::new(Bytes::from(message))).unwrap())
 }
