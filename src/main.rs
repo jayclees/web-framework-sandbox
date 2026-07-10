@@ -4,11 +4,11 @@ mod entity;
 mod error;
 mod helper;
 mod router;
+mod routes;
 
-use crate::action::pages::{ShowAbout, ShowErrorPage, ShowJson, ShowNumberArray, ShowUser};
-use crate::action::pages::{ShowHtml, ShowLanding};
 use crate::app::App;
-use crate::router::{Route, Router};
+use crate::router::Router;
+use crate::routes::register_routes;
 use hyper::rt::Executor;
 use minijinja::{path_loader, Environment};
 use sea_orm::{ConnectOptions, Database};
@@ -25,15 +25,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     // Attempt to load project-root/.env
     dotenvy::dotenv().unwrap();
 
-    let mut router = Router::new();
-
-    router.add(Route::get("/", Box::new(ShowLanding)));
-    router.add(Route::get("/about", Box::new(ShowAbout)));
-    router.add(Route::get("/json-array", Box::new(ShowNumberArray)));
-    router.add(Route::get("/json", Box::new(ShowJson)));
-    router.add(Route::get("/html", Box::new(ShowHtml)));
-    router.add(Route::get("/user/{user}", Box::new(ShowUser)));
-    router.add(Route::get("/error", Box::new(ShowErrorPage)));
+    let router = Router::new(register_routes);
 
     let mut env = Environment::new();
     env.set_loader(path_loader(

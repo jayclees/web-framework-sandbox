@@ -7,8 +7,12 @@ pub struct Router {
 }
 
 impl Router {
-    pub fn new() -> Router {
-        Router { routes: Vec::new() }
+    pub fn new(register_routes: fn(&mut Router)) -> Router {
+        let mut router = Router { routes: Vec::new() };
+
+        register_routes(&mut router);
+
+        router
     }
 
     pub fn add(&mut self, route: Route) -> &mut Router {
