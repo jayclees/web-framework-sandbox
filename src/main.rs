@@ -49,7 +49,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     let app = Arc::new(App::new(router, addr, env, db).await);
 
-    app.run().await
+    app::run(app).await
 }
 
 /// Future executor that utilises `tokio` threads.

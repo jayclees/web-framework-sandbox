@@ -49,86 +49,6 @@ impl App {
         self.db.as_ref()
     }
 
-    pub async fn run(self: Arc<Self>) -> Result<(), Box<dyn Error + Send + Sync>> {
-        loop {
-            let (stream, _) = self.listener().accept().await?;
-            let io = TokioIo::new(stream);
-            let app = Arc::clone(&self);
-
-            tokio::task::spawn(async move {
-                if let Err(err) = auto::Builder::new(TokioExecutor::new())
-                    .serve_connection(
-                        io,
-                        service_fn(move |request: Request<Incoming>| {
-                            let app = Arc::clone(&app);
-                            let wants_json = if let Some(accepts) = request.headers().get("Accept")
-                            {
-                                Some(accepts == "application/json")
-                            } else {
-                                None
-                            };
-
-                            async move {
-                                let option = app.dispatch(&request).await;
-                                match option {
-                                    Some(result) => {
-                                        if let Err(err) = &result {
-                                            if wants_json.unwrap_or(false) {
-                                                return Ok(Response::builder()
-                                                    .status(err.code())
-                                                    .header("Content-Type", "application/json")
-                                                    .body(Full::new(Bytes::from(
-                                                        json!({
-                                                            "code": err.code(),
-                                                            "message": err.message(),
-                                                        })
-                                                        .to_string(),
-                                                    )))
-                                                    .unwrap());
-                                            }
-
-                                            return Ok(Response::builder()
-                                                .status(err.code())
-                                                .body(Full::new(Bytes::from(err.message())))
-                                                .unwrap());
-                                        }
-
-                                        result
-                                    }
-                                    None => {
-                                        // if response wants JSON or is api route, return JSON
-                                        // else, check config for error templates, return that
-                                        if wants_json.unwrap_or(false) {
-                                            return Ok(Response::builder()
-                                                .status(404)
-                                                .header("Content-Type", "application/json")
-                                                .body(Full::new(Bytes::from(
-                                                    json!({
-                                                        "code": 404,
-                                                        "message": "Endpoint not found."
-                                                    })
-                                                    .to_string(),
-                                                )))
-                                                .unwrap());
-                                        }
-
-                                        Ok(Response::builder()
-                                            .status(404)
-                                            .body(Full::new(Bytes::from("Page not found.")))
-                                            .unwrap())
-                                    }
-                                }
-                            }
-                        }),
-                    )
-                    .await
-                {
-                    eprintln!("Error serving connection: {:?}", err);
-                }
-            });
-        }
-    }
-
     pub async fn dispatch(
         &self,
         request: &Request<Incoming>,
@@ -143,5 +63,84 @@ impl App {
             }
             Err(e) => Some(Err(e)),
         }
+    }
+}
+
+pub async fn run(app: Arc<App>) -> Result<(), Box<dyn Error + Send + Sync>> {
+    loop {
+        let (stream, _) = app.listener().accept().await?;
+        let io = TokioIo::new(stream);
+        let app = Arc::clone(&app);
+
+        tokio::task::spawn(async move {
+            if let Err(err) = auto::Builder::new(TokioExecutor::new())
+                .serve_connection(
+                    io,
+                    service_fn(move |request: Request<Incoming>| {
+                        let app = Arc::clone(&app);
+                        let wants_json = if let Some(accepts) = request.headers().get("Accept") {
+                            Some(accepts == "application/json")
+                        } else {
+                            None
+                        };
+
+                        async move {
+                            let option = app.dispatch(&request).await;
+                            match option {
+                                Some(result) => {
+                                    if let Err(err) = &result {
+                                        if wants_json.unwrap_or(false) {
+                                            return Ok(Response::builder()
+                                                .status(err.code())
+                                                .header("Content-Type", "application/json")
+                                                .body(Full::new(Bytes::from(
+                                                    json!({
+                                                        "code": err.code(),
+                                                        "message": err.message(),
+                                                    })
+                                                    .to_string(),
+                                                )))
+                                                .unwrap());
+                                        }
+
+                                        return Ok(Response::builder()
+                                            .status(err.code())
+                                            .body(Full::new(Bytes::from(err.message())))
+                                            .unwrap());
+                                    }
+
+                                    result
+                                }
+                                None => {
+                                    // if response wants JSON or is api route, return JSON
+                                    // else, check config for error templates, return that
+                                    if wants_json.unwrap_or(false) {
+                                        return Ok(Response::builder()
+                                            .status(404)
+                                            .header("Content-Type", "application/json")
+                                            .body(Full::new(Bytes::from(
+                                                json!({
+                                                    "code": 404,
+                                                    "message": "Endpoint not found."
+                                                })
+                                                .to_string(),
+                                            )))
+                                            .unwrap());
+                                    }
+
+                                    Ok(Response::builder()
+                                        .status(404)
+                                        .body(Full::new(Bytes::from("Page not found.")))
+                                        .unwrap())
+                                }
+                            }
+                        }
+                    }),
+                )
+                .await
+            {
+                eprintln!("Error serving connection: {:?}", err);
+            }
+        });
     }
 }
