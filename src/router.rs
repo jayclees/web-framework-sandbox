@@ -36,40 +36,6 @@ impl Router {
             if route.matches(path) {
                 return Some(route);
             }
-
-            // // let mut route_segments = route.segments.iter();
-            // let mut matches = true;
-            //
-            // for (i, segment) in route.segments.iter().enumerate() {
-            //     // matches = req_segments.nth(i) != segment
-            // }
-            //
-            // // Loop over request segments and check the route segment at the corresponding depth.
-            // // If any check fails, set matches to false, break out of loop
-            // // for req_segment in &req_segments {
-            // //     let route_segment = route_segments.nth(i);
-            // //
-            // //     if let Some(segment) = route_segment {
-            // //         matches = match segment {
-            // //             RouteSegment::String(string) => string == req_segment,
-            // //             RouteSegment::Variable { handle: _, matches: _ } => true, // todo add check for regex constraint match
-            // //             RouteSegment::ModelId(_) => todo!(),
-            // //         };
-            // //     } else {
-            // //         // route segments had less segments than
-            // //         matches = false;
-            // //     }
-            // //
-            // //     if !matches {
-            // //         break;
-            // //     }
-            // //
-            // //     i += 1;
-            // // }
-            //
-            // if matches {
-            //     return Some(route);
-            // }
         }
 
         None
@@ -183,42 +149,56 @@ impl Route {
 
         let req_segs = split_segments(path).collect::<Vec<&str>>();
         let rou_segs = &self.segments;
+        let mut matches = true;
         let mut step = 0;
 
         // Loop over both request segments and route segments
         // and process each segment. todo check for wildcard variables
         loop {
-            if let Some(req_seg) = req_segs.iter().nth(step)
-                && let Some(rou_seg) = rou_segs.iter().nth(step)
+            let req_seg = req_segs.iter().nth(step);
+            let rou_seg = rou_segs.iter().nth(step);
+
+            if let None = req_seg && let None = rou_seg {
+                // both ran out at same time
+                // break out of loop and return the current value of matches
+                return matches;
+            }
+
+            // One ran out before the other. Segment counts do not match. Return false.
+            if let Some(_) = req_seg && let None = rou_seg {
+                return false;
+            }
+
+            // One ran out before the other. Segment counts do not match. Return false.
+            if let None = req_seg && let Some(_) = rou_seg {
+                return false;
+            }
+
+            if let Some(req_seg) = req_seg
+                && let Some(rou_seg) = rou_seg
             {
-                return match rou_seg {
+                matches = match rou_seg {
                     RouteSegment::String(rou_seg) => rou_seg == req_seg,
                     RouteSegment::Variable {
                         handle: _,
                         matches: _,
                     } => {
-                        // check if variable has regex constraint
-                        false
+                        // todo check if variable has regex constraint
+                        // it'll always be true unless there is a constraint
+                        true
                     }
-                    RouteSegment::ModelId(_) => {
-                        false
-                    }
+                    RouteSegment::ModelId(_) => true,
                 };
-            } else {
-                return false;
-            }
 
-            match rou_segs.iter().nth(step) {
-                None => {}
-                Some(_) => {}
+                if !matches {
+                    break;
+                }
             }
 
             step += 1;
         }
 
-        // if has variables,
-
-        false
+        matches
     }
 }
 

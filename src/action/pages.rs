@@ -20,8 +20,8 @@ impl Action for ShowLanding {
     //     println!("Logging first time visitor...")
     // }
 }
-#[derive(Debug)]
 
+#[derive(Debug)]
 pub struct ShowAbout;
 
 #[async_trait]
@@ -30,8 +30,18 @@ impl Action for ShowAbout {
         Ok(Box::new("About page".to_string()))
     }
 }
-#[derive(Debug)]
 
+#[derive(Debug)]
+pub struct ShowDeeplyNestedRoute;
+
+#[async_trait]
+impl Action for ShowDeeplyNestedRoute {
+    async fn handle(&self, _app: &App) -> Result<Box<dyn Responsable>, HttpError> {
+        Ok(Box::new("Deeply nested route".to_string()))
+    }
+}
+
+#[derive(Debug)]
 pub struct ShowNumberArray;
 
 #[async_trait]
@@ -42,8 +52,8 @@ impl Action for ShowNumberArray {
         Ok(Box::new(vec))
     }
 }
-#[derive(Debug)]
 
+#[derive(Debug)]
 pub struct ShowJson;
 
 #[async_trait]
@@ -62,8 +72,8 @@ impl Action for ShowJson {
         Ok(Box::new(john))
     }
 }
-#[derive(Debug)]
 
+#[derive(Debug)]
 pub struct ShowHtml;
 
 #[async_trait]
@@ -91,7 +101,8 @@ pub struct ShowUser;
 impl Action for ShowUser {
     async fn handle(&self, app: &App) -> Result<Box<dyn Responsable>, HttpError> {
         let connection = app.db().unwrap();
-        let result = User::find_by_id(1).one(connection).await.unwrap().unwrap();
+        let result = User::find_by_id(1).one(connection).await.unwrap();
+
         Ok(Box::new(json!(result)))
     }
 }
