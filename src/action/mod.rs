@@ -13,8 +13,7 @@ pub mod pages;
 pub trait Action: Send + Sync + Debug {
     async fn handle(&self, app: &App) -> Result<Box<dyn Responsable>, HttpError>;
     async fn log(&self) -> () {
-        // Do nothing
-        println!("Doing nothing...")
+        // Do nothing by default
     }
 }
 

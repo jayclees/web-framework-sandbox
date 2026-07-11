@@ -15,10 +15,6 @@ impl Action for ShowLanding {
     async fn handle(&self, _app: &App) -> Result<Box<dyn Responsable>, HttpError> {
         Ok(Box::new("Home page".to_string()))
     }
-
-    // async fn log(&self) -> () {
-    //     println!("Logging first time visitor...")
-    // }
 }
 
 #[derive(Debug)]
