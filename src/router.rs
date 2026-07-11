@@ -1,5 +1,6 @@
 use crate::action::Action;
 use regex::Regex;
+use std::fmt::{Display, Formatter};
 use std::str::Split;
 use std::sync::LazyLock;
 
@@ -26,42 +27,51 @@ impl Router {
     }
 
     pub fn resolve(&self, path: &str) -> Option<&Route> {
-        let req_parts: Vec<&str> = split_parts(path).collect();
+        let req_segments: Vec<&str> = split_segments(path).collect();
 
         // todo: handle constrained route parameter paths (potential wildcards)
 
         // Loop over routes
         for route in &self.routes {
-            let mut route_parts = route.path_parts.iter();
-            let mut matches = true;
-            let mut i = 0;
-
-            // Loop over request part segments and check the route part at the corresponding depth.
-            // If any check fails, set matches to false, break out of loop
-            for req_part in &req_parts {
-                let route_part = route_parts.nth(i);
-
-                if let Some(part) = route_part {
-                    matches = match part {
-                        PathPart::String(string) => string == req_part,
-                        PathPart::Variable(_, _) => true, // todo add check for regex constraint match
-                        PathPart::ModelId(_) => todo!(),
-                    };
-                } else {
-                    matches = false;
-                }
-
-                if !matches {
-                    break;
-                }
-
-                i = i + 1;
-            }
-
-            if matches {
+            if route.matches(path) {
                 return Some(route);
             }
+
+            // // let mut route_segments = route.segments.iter();
+            // let mut matches = true;
+            //
+            // for (i, segment) in route.segments.iter().enumerate() {
+            //     // matches = req_segments.nth(i) != segment
+            // }
+            //
+            // // Loop over request segments and check the route segment at the corresponding depth.
+            // // If any check fails, set matches to false, break out of loop
+            // // for req_segment in &req_segments {
+            // //     let route_segment = route_segments.nth(i);
+            // //
+            // //     if let Some(segment) = route_segment {
+            // //         matches = match segment {
+            // //             RouteSegment::String(string) => string == req_segment,
+            // //             RouteSegment::Variable { handle: _, matches: _ } => true, // todo add check for regex constraint match
+            // //             RouteSegment::ModelId(_) => todo!(),
+            // //         };
+            // //     } else {
+            // //         // route segments had less segments than
+            // //         matches = false;
+            // //     }
+            // //
+            // //     if !matches {
+            // //         break;
+            // //     }
+            // //
+            // //     i += 1;
+            // // }
+            //
+            // if matches {
+            //     return Some(route);
+            // }
         }
+
         None
     }
 }
@@ -75,7 +85,7 @@ pub struct Route {
     // todo use http::Method(Inner) enum
     method: &'static str,
     path: &'static str,
-    path_parts: Vec<PathPart<'static>>,
+    segments: Vec<RouteSegment<'static>>,
     action: ActionType,
     filter: Option<()>,
 }
@@ -92,7 +102,7 @@ impl Route {
             name: None,
             method,
             path,
-            path_parts: process_parts(split_parts(path)),
+            segments: process_segments(split_segments(path)),
             action,
             filter: None,
         }
@@ -142,53 +152,139 @@ impl Route {
         &self.action
     }
 
+    pub fn name(mut self, name: &'static str) -> Route {
+        self.name = Some(name);
+        self
+    }
+
+    pub fn get_name(&self) -> Option<&'static str> {
+        self.name
+    }
+
     pub fn constrain(&self, parameter: &str, pattern: &str) -> &Self {
         todo!("implement constraints for route parameter");
         self
     }
+
+    pub fn matches(&self, path: &str) -> bool {
+        let variable_segment_count = self
+            .segments
+            .iter()
+            .filter(|seg| match seg {
+                RouteSegment::String(_) => true,
+                _ => false,
+            })
+            .collect::<Vec<&RouteSegment>>()
+            .len();
+        if variable_segment_count == self.segments.len() {
+            // if all segments are strings, just do string equality check
+            return self.path == path;
+        }
+
+        let req_segs = split_segments(path).collect::<Vec<&str>>();
+        let rou_segs = &self.segments;
+        let mut step = 0;
+
+        // Loop over both request segments and route segments
+        // and process each segment. todo check for wildcard variables
+        loop {
+            if let Some(req_seg) = req_segs.iter().nth(step)
+                && let Some(rou_seg) = rou_segs.iter().nth(step)
+            {
+                return match rou_seg {
+                    RouteSegment::String(rou_seg) => rou_seg == req_seg,
+                    RouteSegment::Variable {
+                        handle: _,
+                        matches: _,
+                    } => {
+                        // check if variable has regex constraint
+                        false
+                    }
+                    RouteSegment::ModelId(_) => {
+                        false
+                    }
+                };
+            } else {
+                return false;
+            }
+
+            match rou_segs.iter().nth(step) {
+                None => {}
+                Some(_) => {}
+            }
+
+            step += 1;
+        }
+
+        // if has variables,
+
+        false
+    }
 }
 
 #[derive(Debug)]
-enum PathPart<'a> {
+enum RouteSegment<'a> {
     String(&'a str),
-    Variable(&'a str, Vec<&'a str>),
+    Variable {
+        handle: &'a str,
+        matches: Vec<&'a str>,
+    },
     ModelId(&'a str),
     // regular string path
     // model string name
 }
 
+impl<'a> Display for RouteSegment<'a> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RouteSegment::String(str) => write!(
+                f,
+                "RouteSegment::String({})",
+                if *str == "" { "\"\"" } else { str }
+            ),
+            RouteSegment::Variable { handle, matches } => {
+                write!(f, "RouteSegment::Variable({handle}, {matches:?})")
+            }
+            RouteSegment::ModelId(str) => write!(f, "RouteSegment::ModelId({str})"),
+        }
+    }
+}
+
 /// Since we want to split the route definition path and the request
 /// instance path the same way we will extract it into a helper fn
-fn split_parts<'a>(path: &'a str) -> Split<'a, &'static str> {
+fn split_segments<'a>(path: &'a str) -> Split<'a, &'static str> {
     path.split("/")
 }
 
-fn process_parts<'a>(parts: Split<'a, &'static str>) -> Vec<PathPart<'a>> {
+fn process_segments<'a>(segments: Split<'a, &'static str>) -> Vec<RouteSegment<'a>> {
     let mut result = Vec::new();
 
-    for part in parts.into_iter() {
-        result.push(part_type(part));
+    for segment in segments.into_iter() {
+        result.push(segment_type(segment));
     }
 
     result
 }
 
-fn part_type(part: &str) -> PathPart {
-    let matches: Vec<&str> = REG.find_iter(part).map(|m| m.as_str()).collect();
+fn segment_type(segment: &str) -> RouteSegment<'_> {
+    let matches: Vec<&str> = REG.find_iter(segment).map(|m| m.as_str()).collect();
 
     if matches.len() == 0 {
-        return PathPart::String(part);
+        return RouteSegment::String(segment);
     }
 
     // E.g. example.com/user/{user}
     //                       ^^^^^^
-    PathPart::Variable(part, matches)
+    RouteSegment::Variable {
+        handle: segment,
+        matches,
+    }
 }
 
-fn is_variable(part: &str) -> bool {
+fn is_variable(segment: &str) -> bool {
     todo!()
 }
 
-fn is_model(part: &str) -> bool {
+fn is_model(segment: &str) -> bool {
     todo!()
 }

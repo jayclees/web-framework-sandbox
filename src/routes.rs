@@ -4,7 +4,7 @@ use crate::action::pages::{
 use crate::router::{Route, Router};
 
 pub fn register_routes(router: &mut Router) -> () {
-    router.add(Route::get("/", Box::new(ShowLanding)));
+    router.add(Route::get("/", Box::new(ShowLanding)).name("landing"));
     router.add(Route::get("/about", Box::new(ShowAbout)));
     router.add(Route::get("/json-array", Box::new(ShowNumberArray)));
     router.add(Route::get("/json", Box::new(ShowJson)));

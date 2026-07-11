@@ -89,6 +89,7 @@ pub fn register_panic_hook() {
             // Attempt to write to file.
             match file.lock() {
                 Ok(_) => {
+                    // todo add date/time to log
                     let mut msg = info.to_string();
                     msg.push('\n');
                     file.write_all(msg.to_string().as_bytes()).unwrap();
