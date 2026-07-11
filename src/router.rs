@@ -1,11 +1,11 @@
 use crate::action::Action;
+use crate::error::HttpError;
+use hyper::body::Incoming;
+use hyper::{Method, Request};
 use regex::Regex;
 use std::fmt::{Display, Formatter};
 use std::str::Split;
 use std::sync::LazyLock;
-use hyper::body::Incoming;
-use hyper::{Method, Request};
-use crate::error::HttpError;
 
 static REG: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\{[^_][a-zA-Z0-9_]*[a-zA-Z0-9]}").unwrap());
@@ -37,7 +37,7 @@ impl Router {
                     Err(HttpError::new(405, "Method not allowed".to_string()))
                 } else {
                     Ok(Some(route))
-                }
+                };
             }
         }
 
@@ -161,19 +161,25 @@ impl Route {
             let req_seg = req_segs.iter().nth(step);
             let rou_seg = rou_segs.iter().nth(step);
 
-            if let None = req_seg && let None = rou_seg {
+            if let None = req_seg
+                && let None = rou_seg
+            {
                 // both ran out at same time
                 // break out of loop and return the current value of matches
                 return matches;
             }
 
             // One ran out before the other. Segment counts do not match. Return false.
-            if let Some(_) = req_seg && let None = rou_seg {
+            if let Some(_) = req_seg
+                && let None = rou_seg
+            {
                 return false;
             }
 
             // One ran out before the other. Segment counts do not match. Return false.
-            if let None = req_seg && let Some(_) = rou_seg {
+            if let None = req_seg
+                && let Some(_) = rou_seg
+            {
                 return false;
             }
 
