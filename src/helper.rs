@@ -7,3 +7,5 @@ macro_rules! dd {
         std::process::exit(1);
     };
 }
+
+pub use dd;

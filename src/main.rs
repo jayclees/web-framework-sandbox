@@ -9,12 +9,10 @@ mod routes;
 use crate::app::App;
 use crate::router::Router;
 use crate::routes::register_routes;
-use hyper::rt::Executor;
 use minijinja::{path_loader, Environment};
 use sea_orm::{ConnectOptions, Database};
 use std::env;
 use std::error::Error;
-use std::future::Future;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -50,25 +48,4 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     let app = Arc::new(App::new(router, addr, env, db).await);
 
     app::run(app).await
-}
-
-/// Future executor that utilises `tokio` threads.
-#[non_exhaustive]
-#[derive(Default, Debug, Clone)]
-pub struct TokioExecutor;
-
-impl TokioExecutor {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
-impl<Fut> Executor<Fut> for TokioExecutor
-where
-    Fut: Future + Send + 'static,
-    Fut::Output: Send + 'static,
-{
-    fn execute(&self, fut: Fut) {
-        tokio::spawn(fut);
-    }
 }

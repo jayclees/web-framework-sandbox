@@ -11,4 +11,5 @@ pub fn register_routes(router: &mut Router) -> () {
     router.add(Route::get("/html", Box::new(ShowHtml)));
     router.add(Route::get("/user/{user}", Box::new(ShowUser)));
     router.add(Route::get("/error", Box::new(ShowErrorPage)));
+    // router.add(Route::get("/app/{wildcard}", Box::new(ShowErrorPage)).constrain("wildcard", "/regexpattern/"));
 }

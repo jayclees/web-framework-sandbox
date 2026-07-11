@@ -26,8 +26,39 @@ impl Router {
     }
 
     pub fn resolve(&self, path: &str) -> Option<&Route> {
+        let req_parts: Vec<&str> = split_parts(path).collect();
+
+        // todo: handle constrained route parameter paths (potential wildcards)
+
+        // Loop over routes
         for route in &self.routes {
-            if route.path() == path {
+            let mut route_parts = route.path_parts.iter();
+            let mut matches = true;
+            let mut i = 0;
+
+            // Loop over request part segments and check the route part at the corresponding depth.
+            // If any check fails, set matches to false, break out of loop
+            for req_part in &req_parts {
+                let route_part = route_parts.nth(i);
+
+                if let Some(part) = route_part {
+                    matches = match part {
+                        PathPart::String(string) => string == req_part,
+                        PathPart::Variable(_, _) => true, // todo add check for regex constraint match
+                        PathPart::ModelId(_) => todo!(),
+                    };
+                } else {
+                    matches = false;
+                }
+
+                if !matches {
+                    break;
+                }
+
+                i = i + 1;
+            }
+
+            if matches {
                 return Some(route);
             }
         }

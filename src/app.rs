@@ -1,8 +1,9 @@
+use std::any::Any;
 use crate::error::HttpError;
 use crate::router::Router;
-use crate::TokioExecutor;
 use http_body_util::Full;
 use hyper::body::{Bytes, Incoming};
+use hyper::rt::Executor;
 use hyper::service::service_fn;
 use hyper::{Request, Response};
 use hyper_util::rt::TokioIo;
@@ -12,28 +13,46 @@ use sea_orm::DatabaseConnection;
 use serde_json::json;
 use std::error::Error;
 use std::net::SocketAddr;
+use std::panic::AssertUnwindSafe;
 use std::sync::Arc;
+use futures::FutureExt;
 use tokio::net::TcpListener;
+
+#[derive(Debug)]
+pub struct Env {
+    env: String,
+    debug: bool,
+}
+
+impl Env {
+    // todo implement getters/setters
+    // todo load .env file
+}
 
 pub struct App {
     router: Arc<Router>,
     listener: TcpListener,
     template: Environment<'static>,
     db: Option<DatabaseConnection>,
+    env: Env,
 }
 
 impl App {
     pub async fn new(
         router: Router,
         addr: SocketAddr,
-        env: Environment<'static>,
+        template: Environment<'static>,
         db: DatabaseConnection,
     ) -> App {
         App {
             router: Arc::new(router),
             listener: TcpListener::bind(addr).await.unwrap(),
-            template: env,
+            template,
             db: Some(db),
+            env: Env {
+                env: "production".to_string(),
+                debug: true,
+            }
         }
     }
 
@@ -63,6 +82,27 @@ impl App {
             }
             Err(e) => Some(Err(e)),
         }
+    }
+}
+
+/// Future executor that utilises `tokio` threads.
+#[non_exhaustive]
+#[derive(Default, Debug, Clone)]
+pub struct TokioExecutor;
+
+impl TokioExecutor {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+impl<Fut> Executor<Fut> for TokioExecutor
+where
+    Fut: Future + Send + 'static,
+    Fut::Output: Send + 'static,
+{
+    fn execute(&self, fut: Fut) {
+        tokio::spawn(fut);
     }
 }
 
@@ -98,35 +138,55 @@ async fn handle_request(
         None
     };
 
-    let option = app.dispatch(&request).await;
-    match option {
-        Some(result) => {
-            if let Err(err) = &result {
-                if wants_json.unwrap_or(false) {
-                    let json = json!({
-                        "code": err.code(),
-                        "message": err.message(),
-                    });
-                    return error_response(err.code(), json.to_string(), true);
+    // attempting to catch panics within app.dispatch()
+    match AssertUnwindSafe(app.dispatch(&request)).catch_unwind().await {
+        Ok(option) => {
+            match option {
+                Some(result) => {
+                    if let Err(err) = &result {
+                        if wants_json.unwrap_or(false) {
+                            let json = json!({
+                                "code": err.code(),
+                                "message": err.message(),
+                            });
+                            return error_response(err.code(), json.to_string(), true);
+                        }
+
+                        return error_response(err.code(), err.message(), false);
+                    }
+
+                    result
                 }
+                None => {
+                    // if response wants JSON or is api route, return JSON
+                    // else, check config for error templates, return that
+                    if wants_json.unwrap_or(false) {
+                        let json = json!({
+                            "code": 404,
+                            "message": "Endpoint not found."
+                        });
+                        return error_response(404, json.to_string(), true);
+                    }
 
-                return error_response(err.code(), err.message(), false);
+                    error_response(404, "Page not found.".to_string(), false)
+                }
             }
-
-            result
         }
-        None => {
-            // if response wants JSON or is api route, return JSON
-            // else, check config for error templates, return that
-            if wants_json.unwrap_or(false) {
-                let json = json!({
-                    "code": 404,
-                    "message": "Endpoint not found."
-                });
-                return error_response(404, json.to_string(), true);
-            }
+        Err(error) => {
+            // only if app is local and debug is enabled
+            let msg = if app.env.env == "local" {
+                if let Some(msg) = error.downcast_ref::<&str>() {
+                    *msg
+                } else if let Some(msg) = error.downcast_ref::<String>() {
+                    msg
+                } else {
+                    "Unknown panic."
+                }
+            } else {
+                "Something went wrong."
+            };
 
-            error_response(404, "Page not found.".to_string(), false)
+            error_response(500, msg.to_string(), false)
         }
     }
 }
