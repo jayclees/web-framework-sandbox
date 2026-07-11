@@ -27,7 +27,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
 
     let mut env = Environment::new();
     env.set_loader(path_loader(
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resource/template"),
+        PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("resource/template"),
     ));
 
     let mut opt = ConnectOptions::new(env::var("DATABASE_URL").unwrap());
@@ -45,7 +45,9 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         .await?;
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
-    let app = Arc::new(App::new(router, addr, env, db).await);
+    let app = App::new(router, addr, env, db).await;
+    app.register_panic_hook();
+    let app = Arc::new(app);
 
     app::run(app).await
 }

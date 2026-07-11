@@ -1,6 +1,6 @@
-use std::any::Any;
 use crate::error::HttpError;
 use crate::router::Router;
+use futures::FutureExt;
 use http_body_util::Full;
 use hyper::body::{Bytes, Incoming};
 use hyper::rt::Executor;
@@ -11,12 +11,19 @@ use hyper_util::server::conn::auto;
 use minijinja::Environment;
 use sea_orm::DatabaseConnection;
 use serde_json::json;
+use std::backtrace::Backtrace;
+use std::cell::RefCell;
 use std::error::Error;
+use std::fs::OpenOptions;
+use std::io::Write;
 use std::net::SocketAddr;
 use std::panic::AssertUnwindSafe;
 use std::sync::Arc;
-use futures::FutureExt;
 use tokio::net::TcpListener;
+
+thread_local! {
+    static LAST_BACKTRACE: RefCell<Option<Backtrace>> = RefCell::new(None)
+}
 
 #[derive(Debug)]
 pub struct Env {
@@ -52,7 +59,7 @@ impl App {
             env: Env {
                 env: "production".to_string(),
                 debug: true,
-            }
+            },
         }
     }
 
@@ -82,6 +89,34 @@ impl App {
             }
             Err(e) => Some(Err(e)),
         }
+    }
+
+    pub fn register_panic_hook(&self) -> &App {
+        let default = std::panic::take_hook();
+        std::panic::set_hook(Box::new(move |info| {
+            LAST_BACKTRACE.with(|backtrace| {
+                *backtrace.borrow_mut() = Some(Backtrace::force_capture());
+                let mut file = OpenOptions::new().append(true).open("app.log").unwrap();
+                // todo check if file is too large (say 25mb), if so, create new one `app.{timestamp}.log`
+                // todo delete old log if count > 10
+
+                match file.lock() {
+                    Ok(_) => {
+                        let msg = info.to_string();
+                        file.write_all(msg.to_string().as_bytes())
+                            .unwrap();
+                    }
+                    Err(error) => {
+                        eprintln!("Failed to log panic.");
+                        dbg!(error);
+                    }
+                }
+            });
+
+            // Run the default hook after logging.
+            default(info);
+        }));
+        self
     }
 }
 
@@ -139,7 +174,10 @@ async fn handle_request(
     };
 
     // attempting to catch panics within app.dispatch()
-    match AssertUnwindSafe(app.dispatch(&request)).catch_unwind().await {
+    match AssertUnwindSafe(app.dispatch(&request))
+        .catch_unwind()
+        .await
+    {
         Ok(option) => {
             match option {
                 Some(result) => {
