@@ -3,6 +3,9 @@ use regex::Regex;
 use std::fmt::{Display, Formatter};
 use std::str::Split;
 use std::sync::LazyLock;
+use hyper::body::Incoming;
+use hyper::{Method, Request};
+use crate::error::HttpError;
 
 static REG: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\{[^_][a-zA-Z0-9_]*[a-zA-Z0-9]}").unwrap());
@@ -26,19 +29,19 @@ impl Router {
         self
     }
 
-    pub fn resolve(&self, path: &str) -> Option<&Route> {
-        let req_segments: Vec<&str> = split_segments(path).collect();
-
+    pub fn resolve(&self, request: Request<Incoming>) -> Result<Option<&Route>, HttpError> {
         // todo: handle constrained route parameter paths (potential wildcards)
-
-        // Loop over routes
         for route in &self.routes {
-            if route.matches(path) {
-                return Some(route);
+            if route.matches(request.uri().path()) {
+                return if request.method() != route.method {
+                    Err(HttpError::new(405, "Method not allowed".to_string()))
+                } else {
+                    Ok(Some(route))
+                }
             }
         }
 
-        None
+        Ok(None)
     }
 }
 
@@ -49,7 +52,7 @@ pub struct Route {
     // todo implement route names
     name: Option<&'static str>,
     // todo use http::Method(Inner) enum
-    method: &'static str,
+    method: Method,
     path: &'static str,
     segments: Vec<RouteSegment<'static>>,
     action: ActionType,
@@ -57,7 +60,7 @@ pub struct Route {
 }
 
 impl Route {
-    pub fn new(method: &'static str, path: &'static str, action: ActionType) -> Route {
+    pub fn new(method: Method, path: &'static str, action: ActionType) -> Route {
         // let path = if !path.starts_with("/") {
         //     let t: &'static str = format!("/{path}").as_str();
         //     t
@@ -75,39 +78,39 @@ impl Route {
     }
 
     pub fn get(path: &'static str, action: ActionType) -> Route {
-        Self::new("get", path, action)
+        Self::new(Method::GET, path, action)
     }
 
     pub fn post(path: &'static str, action: ActionType) -> Route {
-        Self::new("post", path, action)
+        Self::new(Method::POST, path, action)
     }
 
     pub fn patch(path: &'static str, action: ActionType) -> Route {
-        Self::new("patch", path, action)
+        Self::new(Method::PATCH, path, action)
     }
 
     pub fn put(path: &'static str, action: ActionType) -> Route {
-        Self::new("put", path, action)
+        Self::new(Method::PUT, path, action)
     }
 
     pub fn delete(path: &'static str, action: ActionType) -> Route {
-        Self::new("delete", path, action)
+        Self::new(Method::DELETE, path, action)
     }
 
     pub fn head(path: &'static str, action: ActionType) -> Route {
-        Self::new("head", path, action)
+        Self::new(Method::HEAD, path, action)
     }
 
     pub fn connect(path: &'static str, action: ActionType) -> Route {
-        Self::new("connect", path, action)
+        Self::new(Method::CONNECT, path, action)
     }
 
     pub fn options(path: &'static str, action: ActionType) -> Route {
-        Self::new("options", path, action)
+        Self::new(Method::OPTIONS, path, action)
     }
 
     pub fn trace(path: &'static str, action: ActionType) -> Route {
-        Self::new("trace", path, action)
+        Self::new(Method::TRACE, path, action)
     }
 
     pub fn path(&self) -> &'static str {

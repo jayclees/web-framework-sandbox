@@ -1,5 +1,3 @@
-use std::backtrace::Backtrace;
-use std::cell::RefCell;
 use crate::error::HttpError;
 use crate::router::Router;
 use futures::FutureExt;
@@ -72,17 +70,25 @@ impl App {
 
     pub async fn dispatch(
         &self,
-        request: &Request<Incoming>,
+        request: Request<Incoming>,
     ) -> Option<Result<Response<Full<Bytes>>, HttpError>> {
-        let route = &self.router.resolve(request.uri().path())?;
+        let result = &self.router.resolve(request);
 
-        match route.action().handle(&self).await {
-            Ok(result) => {
-                route.action().log().await;
-
-                Some(result.to_response())
+        match result {
+            Ok(route) => match route {
+                Some(route) => match route.action().handle(&self).await {
+                    Ok(result) => {
+                        route.action().log().await;
+                        Some(result.to_response())
+                    }
+                    Err(e) => Some(Err(e)),
+                },
+                None => Some(Err(HttpError::new(404, "Page not found".to_string()))),
+            },
+            Err(error) => {
+                // todo figure out why the error param is passed by reference
+                Some(Err(error.clone()))
             }
-            Err(e) => Some(Err(e)),
         }
     }
 }
@@ -141,7 +147,7 @@ async fn handle_request(
     };
 
     // attempting to catch panics within app.dispatch()
-    match AssertUnwindSafe(app.dispatch(&request))
+    match AssertUnwindSafe(app.dispatch(request))
         .catch_unwind()
         .await
     {

@@ -6,7 +6,7 @@ use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::{fmt, fs};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct HttpError {
     code: u16,
     message: String,
