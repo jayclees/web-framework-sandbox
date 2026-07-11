@@ -18,6 +18,7 @@ dotenvy = "0.15.7"
 log = "0.4.33"
 regex = "1.13.0"
 futures = "0.3.32"
+chrono = "0.4.45"
 
 [workspace]
 members = [".", "migration"]

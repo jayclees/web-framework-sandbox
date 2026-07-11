@@ -7,6 +7,7 @@ mod router;
 mod routes;
 
 use crate::app::App;
+use crate::error::register_panic_hook;
 use crate::router::Router;
 use crate::routes::register_routes;
 use minijinja::{path_loader, Environment};
@@ -20,6 +21,8 @@ use std::time::Duration;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
+    register_panic_hook();
+
     // Attempt to load project-root/.env
     dotenvy::dotenv().unwrap();
 
@@ -46,7 +49,6 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     let app = App::new(router, addr, env, db).await;
-    app.register_panic_hook();
     let app = Arc::new(app);
 
     app::run(app).await
