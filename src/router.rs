@@ -1,5 +1,6 @@
 use crate::action::Action;
 use regex::Regex;
+use std::str::Split;
 use std::sync::LazyLock;
 
 static REG: LazyLock<Regex> =
@@ -38,101 +39,68 @@ type ActionType = Box<dyn Action + Send + Sync>;
 
 #[derive(Debug)]
 pub struct Route {
+    // todo implement route names
+    name: Option<&'static str>,
+    // todo use http::Method(Inner) enum
     method: &'static str,
     path: &'static str,
-    path_parts: Vec<PathPart>,
+    path_parts: Vec<PathPart<'static>>,
     action: ActionType,
+    filter: Option<()>,
 }
 
 impl Route {
     pub fn new(method: &'static str, path: &'static str, action: ActionType) -> Route {
+        // let path = if !path.starts_with("/") {
+        //     let t: &'static str = format!("/{path}").as_str();
+        //     t
+        // } else {
+        //     path
+        // };
         Route {
+            name: None,
             method,
             path,
-            path_parts: split_parts(path),
+            path_parts: process_parts(split_parts(path)),
             action,
+            filter: None,
         }
     }
 
     pub fn get(path: &'static str, action: ActionType) -> Route {
-        Route {
-            method: "get",
-            path,
-            path_parts: split_parts(path),
-            action,
-        }
+        Self::new("get", path, action)
     }
 
     pub fn post(path: &'static str, action: ActionType) -> Route {
-        Route {
-            method: "post",
-            path,
-            path_parts: split_parts(path),
-            action,
-        }
+        Self::new("post", path, action)
     }
 
     pub fn patch(path: &'static str, action: ActionType) -> Route {
-        Route {
-            method: "patch",
-            path,
-            path_parts: split_parts(path),
-            action,
-        }
+        Self::new("patch", path, action)
     }
 
     pub fn put(path: &'static str, action: ActionType) -> Route {
-        Route {
-            method: "put",
-            path,
-            path_parts: split_parts(path),
-            action,
-        }
+        Self::new("put", path, action)
     }
 
     pub fn delete(path: &'static str, action: ActionType) -> Route {
-        Route {
-            method: "delete",
-            path,
-            path_parts: split_parts(path),
-            action,
-        }
+        Self::new("delete", path, action)
     }
 
     pub fn head(path: &'static str, action: ActionType) -> Route {
-        Route {
-            method: "head",
-            path,
-            path_parts: split_parts(path),
-            action,
-        }
+        Self::new("head", path, action)
     }
 
     pub fn connect(path: &'static str, action: ActionType) -> Route {
-        Route {
-            method: "connect",
-            path,
-            path_parts: split_parts(path),
-            action,
-        }
+        Self::new("connect", path, action)
     }
 
     pub fn options(path: &'static str, action: ActionType) -> Route {
-        Route {
-            method: "options",
-            path,
-            path_parts: split_parts(path),
-            action,
-        }
+        Self::new("options", path, action)
     }
 
     pub fn trace(path: &'static str, action: ActionType) -> Route {
-        Route {
-            method: "trace",
-            path,
-            path_parts: split_parts(path),
-            action,
-        }
+        Self::new("trace", path, action)
     }
 
     pub fn path(&self) -> &'static str {
@@ -143,27 +111,29 @@ impl Route {
         &self.action
     }
 
-    fn is_variable(part: &str) -> bool {
-        todo!()
-    }
-
-    fn is_model(part: &str) -> bool {
-        todo!()
+    pub fn constrain(&self, parameter: &str, pattern: &str) -> &Self {
+        todo!("implement constraints for route parameter");
+        self
     }
 }
 
 #[derive(Debug)]
-enum PathPart {
-    String(&'static str),
-    Variable(&'static str, Vec<&'static str>),
-    ModelId(&'static str),
+enum PathPart<'a> {
+    String(&'a str),
+    Variable(&'a str, Vec<&'a str>),
+    ModelId(&'a str),
     // regular string path
     // model string name
 }
 
-fn split_parts(path: &'static str) -> Vec<PathPart> {
+/// Since we want to split the route definition path and the request
+/// instance path the same way we will extract it into a helper fn
+fn split_parts<'a>(path: &'a str) -> Split<'a, &'static str> {
+    path.split("/")
+}
+
+fn process_parts<'a>(parts: Split<'a, &'static str>) -> Vec<PathPart<'a>> {
     let mut result = Vec::new();
-    let parts = path.split("/");
 
     for part in parts.into_iter() {
         result.push(part_type(part));
@@ -172,12 +142,22 @@ fn split_parts(path: &'static str) -> Vec<PathPart> {
     result
 }
 
-fn part_type(part: &'static str) -> PathPart {
+fn part_type(part: &str) -> PathPart {
     let matches: Vec<&str> = REG.find_iter(part).map(|m| m.as_str()).collect();
 
     if matches.len() == 0 {
         return PathPart::String(part);
     }
 
+    // E.g. example.com/user/{user}
+    //                       ^^^^^^
     PathPart::Variable(part, matches)
+}
+
+fn is_variable(part: &str) -> bool {
+    todo!()
+}
+
+fn is_model(part: &str) -> bool {
+    todo!()
 }
