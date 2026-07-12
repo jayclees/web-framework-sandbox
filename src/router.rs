@@ -29,7 +29,7 @@ impl Router {
         self
     }
 
-    pub fn resolve(&self, request: Request<Incoming>) -> Result<Option<&Route>, HttpError> {
+    pub fn resolve(&self, request: &Request<Incoming>) -> Result<Option<&Route>, HttpError> {
         // todo: handle constrained route parameter paths (potential wildcards)
         for route in &self.routes {
             if route.matches(request.uri().path()) {
@@ -61,12 +61,7 @@ pub struct Route {
 
 impl Route {
     pub fn new(method: Method, path: &'static str, action: ActionType) -> Route {
-        // let path = if !path.starts_with("/") {
-        //     let t: &'static str = format!("/{path}").as_str();
-        //     t
-        // } else {
-        //     path
-        // };
+        // todo validate or normalize leading slash?
         Route {
             name: None,
             method,

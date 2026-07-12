@@ -3,6 +3,8 @@ use crate::app::App;
 use crate::entity::user::Entity as User;
 use crate::error::HttpError;
 use async_trait::async_trait;
+use hyper::body::Incoming;
+use hyper::Request;
 use sea_orm::EntityTrait;
 use serde::Serialize;
 use serde_json::json;
@@ -12,7 +14,11 @@ pub struct ShowLanding;
 
 #[async_trait]
 impl Action for ShowLanding {
-    async fn handle(&self, _app: &App) -> Result<Box<dyn Responsable>, HttpError> {
+    async fn handle(
+        &self,
+        _app: &App,
+        request: Request<Incoming>,
+    ) -> Result<Box<dyn Responsable>, HttpError> {
         Ok(Box::new("Home page".to_string()))
     }
 }
@@ -22,7 +28,11 @@ pub struct ShowAbout;
 
 #[async_trait]
 impl Action for ShowAbout {
-    async fn handle(&self, _app: &App) -> Result<Box<dyn Responsable>, HttpError> {
+    async fn handle(
+        &self,
+        _app: &App,
+        request: Request<Incoming>,
+    ) -> Result<Box<dyn Responsable>, HttpError> {
         Ok(Box::new("About page".to_string()))
     }
 }
@@ -32,7 +42,11 @@ pub struct ShowDeeplyNestedRoute;
 
 #[async_trait]
 impl Action for ShowDeeplyNestedRoute {
-    async fn handle(&self, _app: &App) -> Result<Box<dyn Responsable>, HttpError> {
+    async fn handle(
+        &self,
+        _app: &App,
+        request: Request<Incoming>,
+    ) -> Result<Box<dyn Responsable>, HttpError> {
         Ok(Box::new("Deeply nested route".to_string()))
     }
 }
@@ -42,7 +56,11 @@ pub struct ShowNumberArray;
 
 #[async_trait]
 impl Action for ShowNumberArray {
-    async fn handle(&self, _app: &App) -> Result<Box<dyn Responsable>, HttpError> {
+    async fn handle(
+        &self,
+        _app: &App,
+        request: Request<Incoming>,
+    ) -> Result<Box<dyn Responsable>, HttpError> {
         let mut vec = Vec::new();
         vec.push(5);
         Ok(Box::new(vec))
@@ -54,7 +72,11 @@ pub struct ShowJson;
 
 #[async_trait]
 impl Action for ShowJson {
-    async fn handle(&self, _app: &App) -> Result<Box<dyn Responsable>, HttpError> {
+    async fn handle(
+        &self,
+        _app: &App,
+        request: Request<Incoming>,
+    ) -> Result<Box<dyn Responsable>, HttpError> {
         let full_name = "John Doe";
         let age_last_year = 42;
         let john = json!({
@@ -74,7 +96,11 @@ pub struct ShowHtml;
 
 #[async_trait]
 impl Action for ShowHtml {
-    async fn handle(&self, app: &App) -> Result<Box<dyn Responsable>, HttpError> {
+    async fn handle(
+        &self,
+        app: &App,
+        request: Request<Incoming>,
+    ) -> Result<Box<dyn Responsable>, HttpError> {
         let template = app.template().get_template("landing.html").unwrap();
         let result = template.render(ExampleStruct {
             app_title: "Bus Web Framework".to_string(),
@@ -95,7 +121,11 @@ pub struct ShowUser;
 
 #[async_trait]
 impl Action for ShowUser {
-    async fn handle(&self, app: &App) -> Result<Box<dyn Responsable>, HttpError> {
+    async fn handle(
+        &self,
+        app: &App,
+        request: Request<Incoming>,
+    ) -> Result<Box<dyn Responsable>, HttpError> {
         let connection = app.db().unwrap();
         let result = User::find_by_id(1).one(connection).await.unwrap();
 
@@ -108,7 +138,11 @@ pub struct ShowErrorPage;
 
 #[async_trait]
 impl Action for ShowErrorPage {
-    async fn handle(&self, _app: &App) -> Result<Box<dyn Responsable>, HttpError> {
+    async fn handle(
+        &self,
+        _app: &App,
+        request: Request<Incoming>,
+    ) -> Result<Box<dyn Responsable>, HttpError> {
         let code = 400;
         Err(HttpError::new(
             code,

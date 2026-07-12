@@ -72,11 +72,11 @@ impl App {
         &self,
         request: Request<Incoming>,
     ) -> Option<Result<Response<Full<Bytes>>, HttpError>> {
-        let result = &self.router.resolve(request);
+        let result = &self.router.resolve(&request);
 
         match result {
             Ok(route) => match route {
-                Some(route) => match route.action().handle(&self).await {
+                Some(route) => match route.action().handle(&self, request).await {
                     Ok(result) => {
                         route.action().log().await;
                         Some(result.to_response())
