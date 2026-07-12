@@ -17,7 +17,7 @@ impl Action for ShowLanding {
     async fn handle(
         &self,
         _app: &App,
-        request: Request<Incoming>,
+        _request: Request<Incoming>,
     ) -> Result<Box<dyn Responsable>, HttpError> {
         Ok(Box::new("Home page".to_string()))
     }
@@ -31,7 +31,7 @@ impl Action for ShowAbout {
     async fn handle(
         &self,
         _app: &App,
-        request: Request<Incoming>,
+        _request: Request<Incoming>,
     ) -> Result<Box<dyn Responsable>, HttpError> {
         Ok(Box::new("About page".to_string()))
     }
@@ -45,7 +45,7 @@ impl Action for ShowDeeplyNestedRoute {
     async fn handle(
         &self,
         _app: &App,
-        request: Request<Incoming>,
+        _request: Request<Incoming>,
     ) -> Result<Box<dyn Responsable>, HttpError> {
         Ok(Box::new("Deeply nested route".to_string()))
     }
@@ -59,7 +59,7 @@ impl Action for ShowNumberArray {
     async fn handle(
         &self,
         _app: &App,
-        request: Request<Incoming>,
+        _request: Request<Incoming>,
     ) -> Result<Box<dyn Responsable>, HttpError> {
         let mut vec = Vec::new();
         vec.push(5);
@@ -75,7 +75,7 @@ impl Action for ShowJson {
     async fn handle(
         &self,
         _app: &App,
-        request: Request<Incoming>,
+        _request: Request<Incoming>,
     ) -> Result<Box<dyn Responsable>, HttpError> {
         let full_name = "John Doe";
         let age_last_year = 42;
@@ -99,7 +99,7 @@ impl Action for ShowHtml {
     async fn handle(
         &self,
         app: &App,
-        request: Request<Incoming>,
+        _request: Request<Incoming>,
     ) -> Result<Box<dyn Responsable>, HttpError> {
         let template = app.template().get_template("landing.html").unwrap();
         let result = template.render(ExampleStruct {
@@ -124,7 +124,7 @@ impl Action for ShowUser {
     async fn handle(
         &self,
         app: &App,
-        request: Request<Incoming>,
+        _request: Request<Incoming>,
     ) -> Result<Box<dyn Responsable>, HttpError> {
         let connection = app.db().unwrap();
         let result = User::find_by_id(1).one(connection).await.unwrap();
@@ -141,12 +141,26 @@ impl Action for ShowErrorPage {
     async fn handle(
         &self,
         _app: &App,
-        request: Request<Incoming>,
+        _request: Request<Incoming>,
     ) -> Result<Box<dyn Responsable>, HttpError> {
         let code = 400;
         Err(HttpError::new(
             code,
             format!("Error ({}). Please change request and try again.", code),
         ))
+    }
+}
+
+#[derive(Debug)]
+pub struct ServeApp;
+
+#[async_trait]
+impl Action for ServeApp {
+    async fn handle(
+        &self,
+        _app: &App,
+        _request: Request<Incoming>,
+    ) -> Result<Box<dyn Responsable>, HttpError> {
+        Ok(Box::new("good".to_string()))
     }
 }

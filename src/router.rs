@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use crate::action::Action;
 use crate::error::HttpError;
 use hyper::body::Incoming;
@@ -38,7 +39,7 @@ impl Router {
             path,
             segments: process_segments(split_segments(path)),
             action: Box::new(action),
-            filter: None,
+            constraints: HashMap::new(),
         };
 
         if let Some(modifier) = modifier {
@@ -176,7 +177,7 @@ pub struct Route {
     path: &'static str,
     segments: Vec<RouteSegment<'static>>,
     action: ActionType,
-    filter: Option<()>,
+    constraints: HashMap<&'static str, Regex>,
 }
 
 impl Route {
@@ -187,7 +188,7 @@ impl Route {
             path,
             segments: process_segments(split_segments(path)),
             action,
-            filter: None,
+            constraints: HashMap::new()
         }
     }
 
@@ -208,8 +209,8 @@ impl Route {
         self.name
     }
 
-    pub fn constrain(&self, parameter: &str, pattern: &str) -> &Self {
-        todo!("implement constraints for route parameter");
+    pub fn constrain(mut self, parameter: &'static str, pattern: &str) -> Route {
+        self.constraints.insert(parameter, Regex::new(pattern).expect("Regex failed to compile."));
         self
     }
 
