@@ -1,5 +1,5 @@
 use crate::action::pages::{
-    ShowAbout, ShowDeeplyNestedRoute, ShowErrorPage, ShowHtml, ShowJson, ShowLanding,
+    ServeApp, ShowAbout, ShowDeeplyNestedRoute, ShowErrorPage, ShowHtml, ShowJson, ShowLanding,
     ShowNumberArray, ShowUser,
 };
 use crate::router::Router;
@@ -15,8 +15,8 @@ pub fn register_routes(router: &mut Router) -> () {
     // router.get("/user/{user}/post/{post}", ShowUser, None);
     router.get("/error", ShowErrorPage, None);
     router.get(
-        "/app/{wildcard}",
-        ShowErrorPage,
+        "/app-{wildcard}",
+        ServeApp,
         Some(|route| route.constrain("wildcard", ".*")),
     );
 }

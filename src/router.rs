@@ -4,7 +4,7 @@ use hyper::body::Incoming;
 use hyper::{Method, Request};
 use regex::Regex;
 use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
+use std::ops::Range;
 use std::str::Split;
 use std::sync::LazyLock;
 
@@ -32,7 +32,6 @@ impl Router {
         action: A,
         modifier: Option<fn(Route) -> Route>,
     ) -> &mut Router {
-        // todo validate or normalize leading slash?
         let mut route = Route::new(method, path, action);
 
         if let Some(modifier) = modifier {
@@ -166,13 +165,14 @@ pub struct Route {
     // todo use http::Method(Inner) enum
     method: Method,
     path: &'static str,
-    segments: Vec<RouteSegment<'static>>,
+    segments: Vec<RouteSegment>,
     action: Box<dyn Action + 'static>,
     constraints: HashMap<&'static str, Regex>,
 }
 
 impl Route {
     pub fn new<A: Action + 'static>(method: Method, path: &'static str, action: A) -> Route {
+        // todo validate or normalize leading slash?
         Route {
             name: None,
             method,
@@ -209,23 +209,9 @@ impl Route {
     }
 
     pub fn matches(&self, path: &str) -> bool {
-        let variable_segment_count = self
-            .segments
-            .iter()
-            .filter(|seg| match seg {
-                RouteSegment::String(_) => true,
-                _ => false,
-            })
-            .collect::<Vec<&RouteSegment>>()
-            .len();
-        if variable_segment_count == self.segments.len() {
-            // if all segments are strings, just do string equality check
-            return self.path == path;
-        }
-
         let req_segs = split_segments(path).collect::<Vec<&str>>();
         let rou_segs = &self.segments;
-        let mut matches = true;
+        let mut is_match = true;
         let mut step = 0;
 
         // Loop over both request segments and route segments
@@ -234,12 +220,11 @@ impl Route {
             let req_seg = req_segs.iter().nth(step);
             let rou_seg = rou_segs.iter().nth(step);
 
+            // Both ran out at same time, break out of loop and return the current value of matches
             if let None = req_seg
                 && let None = rou_seg
             {
-                // both ran out at same time
-                // break out of loop and return the current value of matches
-                return matches;
+                return is_match;
             }
 
             // One ran out before the other. Segment counts do not match. Return false.
@@ -259,20 +244,16 @@ impl Route {
             if let Some(req_seg) = req_seg
                 && let Some(rou_seg) = rou_seg
             {
-                matches = match rou_seg {
-                    RouteSegment::String(rou_seg) => rou_seg == req_seg,
-                    RouteSegment::Variable {
-                        handle: _,
-                        matches: _,
-                    } => {
-                        // todo check if variable has regex constraint
-                        // it'll always be true unless there is a constraint
-                        true
-                    }
-                    RouteSegment::ModelId(_) => true,
-                };
+                let has_variables = rou_seg.variables.len() > 0;
 
-                if !matches {
+                if has_variables {
+                    // req: app-(some-random-string/test)
+                    // rou: app-{wildcard}
+                } else {
+                    is_match = *req_seg == rou_seg.string;
+                }
+
+                if !is_match {
                     break;
                 }
             }
@@ -280,36 +261,37 @@ impl Route {
             step += 1;
         }
 
-        matches
+        is_match
     }
 }
 
 #[derive(Debug)]
-enum RouteSegment<'a> {
-    String(&'a str),
-    Variable {
-        handle: &'a str,
-        matches: Vec<&'a str>,
-    },
-    ModelId(&'a str),
-    // regular string path
-    // model string name
+struct RouteSegment {
+    string: &'static str,
+    variables: Vec<RouteVariable>,
 }
 
-impl<'a> Display for RouteSegment<'a> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            RouteSegment::String(str) => write!(
-                f,
-                "RouteSegment::String({})",
-                if *str == "" { "\"\"" } else { str }
-            ),
-            RouteSegment::Variable { handle, matches } => {
-                write!(f, "RouteSegment::Variable({handle}, {matches:?})")
-            }
-            RouteSegment::ModelId(str) => write!(f, "RouteSegment::ModelId({str})"),
-        }
+impl RouteSegment {
+    pub fn new(segment: &'static str) -> RouteSegment {
+        let matches: Vec<RouteVariable> = REG
+            .find_iter(segment)
+            .map(|m| {
+                (m.range(), m.as_str());
+                RouteVariable {
+                    handle: m.as_str(),
+                    range: m.range(),
+                }
+            })
+            .collect();
+
+        RouteSegment { string: segment, variables: matches }
     }
+}
+
+#[derive(Debug)]
+struct RouteVariable {
+    handle: &'static str,
+    range: Range<usize>,
 }
 
 /// Since we want to split the route definition path and the request
@@ -318,29 +300,14 @@ fn split_segments<'a>(path: &'a str) -> Split<'a, &'static str> {
     path.split("/")
 }
 
-fn process_segments<'a>(segments: Split<'a, &'static str>) -> Vec<RouteSegment<'a>> {
+fn process_segments(segments: Split<'static, &'static str>) -> Vec<RouteSegment> {
     let mut result = Vec::new();
 
     for segment in segments.into_iter() {
-        result.push(segment_type(segment));
+        result.push(RouteSegment::new(segment));
     }
 
     result
-}
-
-fn segment_type(segment: &str) -> RouteSegment<'_> {
-    let matches: Vec<&str> = REG.find_iter(segment).map(|m| m.as_str()).collect();
-
-    if matches.len() == 0 {
-        return RouteSegment::String(segment);
-    }
-
-    // E.g. example.com/user/{user}
-    //                       ^^^^^^
-    RouteSegment::Variable {
-        handle: segment,
-        matches,
-    }
 }
 
 fn is_variable(segment: &str) -> bool {

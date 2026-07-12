@@ -184,8 +184,8 @@ async fn handle_request(
             }
         }
         Err(error) => {
-            // only if app is local and debug is enabled
-            let msg = if app.env.env == "local" {
+            // Server error. Send details if app is local and debug is enabled
+            let msg = if app.env.env == "local" && app.env.debug {
                 if let Some(msg) = error.downcast_ref::<&str>() {
                     *msg
                 } else if let Some(msg) = error.downcast_ref::<String>() {
