@@ -166,8 +166,6 @@ impl Router {
     }
 }
 
-type ActionType = Box<dyn Action + Send + Sync>;
-
 #[derive(Debug)]
 pub struct Route {
     // todo implement route names
@@ -176,12 +174,12 @@ pub struct Route {
     method: Method,
     path: &'static str,
     segments: Vec<RouteSegment<'static>>,
-    action: ActionType,
+    action: Box<dyn Action + 'static>,
     constraints: HashMap<&'static str, Regex>,
 }
 
 impl Route {
-    pub fn new(method: Method, path: &'static str, action: ActionType) -> Route {
+    pub fn new(method: Method, path: &'static str, action: Box<dyn Action + 'static>) -> Route {
         Route {
             name: None,
             method,
@@ -196,7 +194,7 @@ impl Route {
         self.path
     }
 
-    pub fn action(&self) -> &ActionType {
+    pub fn action(&self) -> &Box<dyn Action + 'static> {
         &self.action
     }
 
