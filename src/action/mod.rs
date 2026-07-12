@@ -1,17 +1,22 @@
-use crate::app::App;
 use crate::error::HttpError;
-use async_trait::async_trait;
 use http_body_util::Full;
 use hyper::body::Bytes;
 use hyper::Response;
 use serde_json::Value;
-use std::fmt::Debug;
 
 pub mod pages;
 
-#[async_trait]
-pub trait Action: Send + Sync + Debug {
-    async fn handle(&self, app: &App) -> Result<Box<dyn Responsable>, HttpError>;
+#[derive(Debug)]
+pub struct Action {
+    pub handler: fn() -> Result<Response<Full<Bytes>>, HttpError>,
+}
+
+impl Action {
+    pub async fn handle(&self) -> Result<Response<Full<Bytes>>, HttpError> {
+        let t = self.handler;
+        t()
+    }
+
     async fn log(&self) -> () {
         // Do nothing by default
     }

@@ -17,6 +17,7 @@ use std::net::SocketAddr;
 use std::panic::AssertUnwindSafe;
 use std::sync::Arc;
 use tokio::net::TcpListener;
+use crate::action::Action;
 
 #[derive(Debug)]
 pub struct Env {
@@ -76,10 +77,10 @@ impl App {
 
         match result {
             Ok(route) => match route {
-                Some(route) => match route.action().handle(&self).await {
+                Some(route) => match route.action().handle().await {
                     Ok(result) => {
-                        route.action().log().await;
-                        Some(result.to_response())
+                        // route.action().log().await;
+                        Some(Ok(result))
                     }
                     Err(e) => Some(Err(e)),
                 },
