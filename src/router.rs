@@ -24,8 +24,128 @@ impl Router {
         router
     }
 
-    pub fn add(&mut self, route: Route) -> &mut Router {
+    pub fn add<A: Action + 'static>(
+        &mut self,
+        method: Method,
+        path: &'static str,
+        action: A,
+        modifier: Option<fn(Route) -> Route>
+    ) -> &mut Router {
+        // todo validate or normalize leading slash?
+        let mut route = Route {
+            name: None,
+            method,
+            path,
+            segments: process_segments(split_segments(path)),
+            action: Box::new(action),
+            filter: None,
+        };
+
+        if let Some(modifier) = modifier {
+            route = modifier(route);
+        }
+
         self.routes.push(route);
+
+        self
+    }
+
+    pub fn get<A: Action + 'static>(
+        &mut self,
+        path: &'static str,
+        action: A,
+        modifier: Option<fn(Route) -> Route>
+    ) -> &mut Router {
+        self.add(Method::GET, path, action, modifier);
+
+        self
+    }
+
+    pub fn post<A: Action + 'static>(
+        &mut self,
+        path: &'static str,
+        action: A,
+        modifier: Option<fn(Route) -> Route>
+    ) -> &mut Router {
+        self.add(Method::POST, path, action, modifier);
+
+        self
+    }
+
+    pub fn patch<A: Action + 'static>(
+        &mut self,
+        path: &'static str,
+        action: A,
+        modifier: Option<fn(Route) -> Route>
+    ) -> &mut Router {
+        self.add(Method::PATCH, path, action, modifier);
+
+        self
+    }
+
+    pub fn put<A: Action + 'static>(
+        &mut self,
+        path: &'static str,
+        action: A,
+        modifier: Option<fn(Route) -> Route>
+    ) -> &mut Router {
+        self.add(Method::PUT, path, action, modifier);
+
+        self
+    }
+
+    pub fn delete<A: Action + 'static>(
+        &mut self,
+        path: &'static str,
+        action: A,
+        modifier: Option<fn(Route) -> Route>
+    ) -> &mut Router {
+        self.add(Method::DELETE, path, action, modifier);
+
+        self
+    }
+
+    pub fn head<A: Action + 'static>(
+        &mut self,
+        path: &'static str,
+        action: A,
+        modifier: Option<fn(Route) -> Route>
+    ) -> &mut Router {
+        self.add(Method::HEAD, path, action, modifier);
+
+        self
+    }
+
+    pub fn connect<A: Action + 'static>(
+        &mut self,
+        path: &'static str,
+        action: A,
+        modifier: Option<fn(Route) -> Route>
+    ) -> &mut Router {
+        self.add(Method::CONNECT, path, action, modifier);
+
+        self
+    }
+
+    pub fn options<A: Action + 'static>(
+        &mut self,
+        path: &'static str,
+        action: A,
+        modifier: Option<fn(Route) -> Route>
+    ) -> &mut Router {
+        self.add(Method::OPTIONS, path, action, modifier);
+
+        self
+    }
+
+    pub fn trace<A: Action + 'static>(
+        &mut self,
+        path: &'static str,
+        action: A,
+        modifier: Option<fn(Route) -> Route>
+    ) -> &mut Router {
+        self.add(Method::TRACE, path, action, modifier);
+
         self
     }
 
@@ -61,7 +181,6 @@ pub struct Route {
 
 impl Route {
     pub fn new(method: Method, path: &'static str, action: ActionType) -> Route {
-        // todo validate or normalize leading slash?
         Route {
             name: None,
             method,
@@ -70,42 +189,6 @@ impl Route {
             action,
             filter: None,
         }
-    }
-
-    pub fn get(path: &'static str, action: ActionType) -> Route {
-        Self::new(Method::GET, path, action)
-    }
-
-    pub fn post(path: &'static str, action: ActionType) -> Route {
-        Self::new(Method::POST, path, action)
-    }
-
-    pub fn patch(path: &'static str, action: ActionType) -> Route {
-        Self::new(Method::PATCH, path, action)
-    }
-
-    pub fn put(path: &'static str, action: ActionType) -> Route {
-        Self::new(Method::PUT, path, action)
-    }
-
-    pub fn delete(path: &'static str, action: ActionType) -> Route {
-        Self::new(Method::DELETE, path, action)
-    }
-
-    pub fn head(path: &'static str, action: ActionType) -> Route {
-        Self::new(Method::HEAD, path, action)
-    }
-
-    pub fn connect(path: &'static str, action: ActionType) -> Route {
-        Self::new(Method::CONNECT, path, action)
-    }
-
-    pub fn options(path: &'static str, action: ActionType) -> Route {
-        Self::new(Method::OPTIONS, path, action)
-    }
-
-    pub fn trace(path: &'static str, action: ActionType) -> Route {
-        Self::new(Method::TRACE, path, action)
     }
 
     pub fn path(&self) -> &'static str {

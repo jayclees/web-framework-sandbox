@@ -2,20 +2,17 @@ use crate::action::pages::{
     ShowAbout, ShowDeeplyNestedRoute, ShowErrorPage, ShowHtml, ShowJson, ShowLanding,
     ShowNumberArray, ShowUser,
 };
-use crate::router::{Route, Router};
+use crate::router::Router;
 
 pub fn register_routes(router: &mut Router) -> () {
-    router.add(Route::get("/", Box::new(ShowLanding)).name("landing"));
-    router.add(Route::get("/about", Box::new(ShowAbout)));
-    router.add(Route::get(
-        "/deeply/nested/route",
-        Box::new(ShowDeeplyNestedRoute),
-    ));
-    router.add(Route::get("/json-array", Box::new(ShowNumberArray)));
-    router.add(Route::get("/json", Box::new(ShowJson)));
-    router.add(Route::get("/html", Box::new(ShowHtml)));
-    router.add(Route::get("/user/{user}", Box::new(ShowUser)));
-    // router.add(Route::get("/user/{user}/post/{post}", Box::new(ShowUser)));
-    router.add(Route::get("/error", Box::new(ShowErrorPage)));
-    // router.add(Route::get("/app/{wildcard}", Box::new(ShowErrorPage)).constrain("wildcard", "/regexpattern/"));
+    router.get("/", ShowLanding, Some(|route| route.name("landing")));
+    router.get("/about", ShowAbout, None);
+    router.get("/deeply/nested/route", ShowDeeplyNestedRoute, None);
+    router.get("/json-array", ShowNumberArray, None);
+    router.get("/json", ShowJson, None);
+    router.get("/html", ShowHtml, None);
+    router.get("/user/{user}", ShowUser, None);
+    // router.get("/user/{user}/post/{post}", ShowUser, None);
+    router.get("/error", ShowErrorPage, None);
+    // router.get(Route::get("/app/{wildcard}", ShowErrorPage).constrain("wildcard", "/regexpattern/", None);
 }
