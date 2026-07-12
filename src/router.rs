@@ -1,9 +1,9 @@
-use std::collections::HashMap;
 use crate::action::Action;
 use crate::error::HttpError;
 use hyper::body::Incoming;
 use hyper::{Method, Request};
 use regex::Regex;
+use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::str::Split;
 use std::sync::LazyLock;
@@ -30,17 +30,10 @@ impl Router {
         method: Method,
         path: &'static str,
         action: A,
-        modifier: Option<fn(Route) -> Route>
+        modifier: Option<fn(Route) -> Route>,
     ) -> &mut Router {
         // todo validate or normalize leading slash?
-        let mut route = Route {
-            name: None,
-            method,
-            path,
-            segments: process_segments(split_segments(path)),
-            action: Box::new(action),
-            constraints: HashMap::new(),
-        };
+        let mut route = Route::new(method, path, action);
 
         if let Some(modifier) = modifier {
             route = modifier(route);
@@ -55,7 +48,7 @@ impl Router {
         &mut self,
         path: &'static str,
         action: A,
-        modifier: Option<fn(Route) -> Route>
+        modifier: Option<fn(Route) -> Route>,
     ) -> &mut Router {
         self.add(Method::GET, path, action, modifier);
 
@@ -66,7 +59,7 @@ impl Router {
         &mut self,
         path: &'static str,
         action: A,
-        modifier: Option<fn(Route) -> Route>
+        modifier: Option<fn(Route) -> Route>,
     ) -> &mut Router {
         self.add(Method::POST, path, action, modifier);
 
@@ -77,7 +70,7 @@ impl Router {
         &mut self,
         path: &'static str,
         action: A,
-        modifier: Option<fn(Route) -> Route>
+        modifier: Option<fn(Route) -> Route>,
     ) -> &mut Router {
         self.add(Method::PATCH, path, action, modifier);
 
@@ -88,7 +81,7 @@ impl Router {
         &mut self,
         path: &'static str,
         action: A,
-        modifier: Option<fn(Route) -> Route>
+        modifier: Option<fn(Route) -> Route>,
     ) -> &mut Router {
         self.add(Method::PUT, path, action, modifier);
 
@@ -99,7 +92,7 @@ impl Router {
         &mut self,
         path: &'static str,
         action: A,
-        modifier: Option<fn(Route) -> Route>
+        modifier: Option<fn(Route) -> Route>,
     ) -> &mut Router {
         self.add(Method::DELETE, path, action, modifier);
 
@@ -110,7 +103,7 @@ impl Router {
         &mut self,
         path: &'static str,
         action: A,
-        modifier: Option<fn(Route) -> Route>
+        modifier: Option<fn(Route) -> Route>,
     ) -> &mut Router {
         self.add(Method::HEAD, path, action, modifier);
 
@@ -121,7 +114,7 @@ impl Router {
         &mut self,
         path: &'static str,
         action: A,
-        modifier: Option<fn(Route) -> Route>
+        modifier: Option<fn(Route) -> Route>,
     ) -> &mut Router {
         self.add(Method::CONNECT, path, action, modifier);
 
@@ -132,7 +125,7 @@ impl Router {
         &mut self,
         path: &'static str,
         action: A,
-        modifier: Option<fn(Route) -> Route>
+        modifier: Option<fn(Route) -> Route>,
     ) -> &mut Router {
         self.add(Method::OPTIONS, path, action, modifier);
 
@@ -143,7 +136,7 @@ impl Router {
         &mut self,
         path: &'static str,
         action: A,
-        modifier: Option<fn(Route) -> Route>
+        modifier: Option<fn(Route) -> Route>,
     ) -> &mut Router {
         self.add(Method::TRACE, path, action, modifier);
 
@@ -179,14 +172,14 @@ pub struct Route {
 }
 
 impl Route {
-    pub fn new(method: Method, path: &'static str, action: Box<dyn Action + 'static>) -> Route {
+    pub fn new<A: Action + 'static>(method: Method, path: &'static str, action: A) -> Route {
         Route {
             name: None,
             method,
             path,
             segments: process_segments(split_segments(path)),
-            action,
-            constraints: HashMap::new()
+            action: Box::new(action),
+            constraints: HashMap::new(),
         }
     }
 
@@ -208,7 +201,10 @@ impl Route {
     }
 
     pub fn constrain(mut self, parameter: &'static str, pattern: &str) -> Route {
-        self.constraints.insert(parameter, Regex::new(pattern).expect("Regex failed to compile."));
+        self.constraints.insert(
+            parameter,
+            Regex::new(pattern).expect("Regex failed to compile."),
+        );
         self
     }
 
