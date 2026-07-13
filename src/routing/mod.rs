@@ -204,6 +204,7 @@ enum Constraint {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::get_line;
     use std::fmt::{Display, Formatter};
 
     impl Display for Token {
@@ -522,12 +523,4 @@ mod tests {
 
         Ok(())
     }
-
-    macro_rules! get_line {
-        () => {
-            format!("{}:{}:{}", file!(), line!(), column!())
-        };
-    }
-
-    use get_line;
 }

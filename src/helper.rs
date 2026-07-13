@@ -9,3 +9,12 @@ macro_rules! dd {
 }
 
 pub use dd;
+
+#[macro_export]
+macro_rules! get_line {
+    () => {
+        format!("{}:{}:{}", file!(), line!(), column!())
+    };
+}
+
+pub use get_line;
