@@ -1,11 +1,10 @@
-use std::borrow::Cow;
-use std::ops::Range;
-use std::str::Split;
-use std::sync::LazyLock;
-use hyper::Method;
-use regex::Regex;
 use crate::action::Action;
 use crate::routing::{split_segments, SegmentTokenizer, Token, TokenType};
+use hyper::Method;
+use regex::Regex;
+use std::borrow::Cow;
+use std::ops::Range;
+use std::sync::LazyLock;
 
 static REG: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\{[^_][a-zA-Z0-9_]*[a-zA-Z0-9]}").unwrap());
@@ -79,7 +78,7 @@ impl Route {
     }
 
     pub fn matches(&self, path: &str) -> bool {
-        let req_segs = split_segments(path).collect::<Vec<&str>>();
+        let req_segs = split_segments(path);
         let rou_segs = &self.segments;
         let mut is_match = true;
         let mut step = 0;
@@ -114,35 +113,21 @@ impl Route {
             if let Some(req_seg) = req_seg
                 && let Some(rou_seg) = rou_seg
             {
-                // let has_variables = rou_seg.variables.len() > 0;
-                //
-                // if has_variables {
-                //     for variable in &rou_seg.variables {
-                //         let start = variable.range.start;
-                //         let start_is_match = req_seg[..start] == rou_seg.segment[..start];
-                //
-                //         if ! start_is_match {
-                //             is_match = false;
-                //             break;
-                //         }
-                //
-                //         is_match = match &variable.constraint {
-                //             Constraint::Default => true,
-                //             Constraint::Wildcard(enabled) => {
-                //                 if *enabled {
-                //                     // Return true out of matches function to mark as the resolved route
-                //                     return true;
-                //                 }
-                //                 false
-                //             }
-                //             Constraint::Regex(pattern) => {
-                //                 false
-                //             },
-                //         }
-                //     }
-                // } else {
-                //     is_match = *req_seg == rou_seg.segment;
-                // }
+                dbg!(req_seg);
+                dbg!(&rou_seg.tokens);
+
+                for token in &rou_seg.tokens {
+                    if token.token_type == TokenType::Static {
+                        if &req_seg.len() < &token.range.end {
+                            is_match = false;
+                            break;
+                        }
+                        if &req_seg[token.range.clone()] != token.slice {
+                            is_match = false;
+                            break;
+                        }
+                    }
+                }
 
                 if !is_match {
                     break;
@@ -197,7 +182,7 @@ enum Constraint {
     Regex(Regex),
 }
 
-fn process_segments(segments: Split<'static, &'static str>) -> Vec<RouteSegment> {
+fn process_segments(segments: Vec<&'static str>) -> Vec<RouteSegment> {
     let mut result = Vec::new();
 
     for segment in segments.into_iter() {

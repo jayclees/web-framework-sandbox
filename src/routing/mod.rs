@@ -1,14 +1,23 @@
 use regex::Regex;
 use std::ops::Range;
 use std::str::Split;
+use std::sync::LazyLock;
 
 mod route;
 pub mod router;
 
+static PATH_SEPARATOR: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"/").unwrap());
+
 /// Since we want to split the route definition path and the request
 /// instance path the same way we will extract it into a helper fn
-fn split_segments<'a>(path: &'a str) -> Split<'a, &'static str> {
-    path.split("/")
+fn split_segments(path: &str) -> Vec<&str> {
+    // Special case for single slash
+    if path == "/" {
+        return vec![""];
+    }
+
+    path.split("/").collect()
 }
 
 #[derive(Debug)]
@@ -28,6 +37,11 @@ impl SegmentTokenizer {
     }
 
     fn tokenize(&mut self) -> Vec<Token> {
+        // see tokenizer::split_segments
+        if self.segment == "" {
+            return vec![Token::new_stat(0..0, "")];
+        }
+
         let mut tokens: Vec<Token> = vec![];
 
         for (i, char) in self.segment.chars().enumerate() {
@@ -207,128 +221,15 @@ mod tests {
     use crate::get_line;
     use std::fmt::{Display, Formatter};
 
-    impl Display for Token {
-        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-            write!(
-                f,
-                "Token {{ token_type: {}, range: {}, slice: \"{}\", constraint: {} }}",
-                self.token_type,
-                format!("Range {{ {}..{} }}", self.range.start, self.range.end),
-                self.slice,
-                self.constraint,
-            )
-        }
-    }
-    impl Display for TokenType {
-        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-            match self {
-                TokenType::Static => write!(f, "{}", "TokenType::Static"),
-                TokenType::Variable => write!(f, "{}", "TokenType::Variable"),
-            }
-        }
-    }
-
-    impl Display for Constraint {
-        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-            match self {
-                Constraint::Default => write!(f, "{}", "Constraint::Default"),
-                Constraint::Wildcard => write!(f, "{}", "Constraint::Wildcard"),
-                Constraint::Regex(re) => {
-                    write!(f, "{}", format!("Constraint::Regex(\"{}\")", re.as_str()))
-                }
-            }
-        }
-    }
-
-    impl Clone for Token {
-        fn clone(&self) -> Token {
-            Token {
-                token_type: self.token_type.clone(),
-                range: self.range.clone(),
-                slice: self.slice.clone(),
-                constraint: Constraint::Default.clone(),
-            }
-        }
-    }
-
-    impl Clone for TokenType {
-        fn clone(&self) -> TokenType {
-            match self {
-                TokenType::Static => TokenType::Static,
-                TokenType::Variable => TokenType::Variable,
-            }
-        }
-    }
-
-    impl Clone for Constraint {
-        fn clone(&self) -> Constraint {
-            match self {
-                Constraint::Default => Constraint::Default,
-                Constraint::Wildcard => Constraint::Wildcard,
-                Constraint::Regex(regex) => Constraint::Regex(Regex::new(regex.as_str()).unwrap()),
-            }
-        }
-    }
-
-    fn cmp_tokens(a: Token, b: Token, calling_line: String) -> Result<(), String> {
-        if a.token_type != b.token_type {
-            println!("Left:  {a}\nRight: {b}");
-            return Err(String::from(format!(
-                "Token types do not match. {calling_line}"
-            )));
-        }
-
-        if a.slice != b.slice {
-            println!("Left:  {a}\nRight: {b}");
-            return Err(String::from(format!(
-                "Token slices do not match. {calling_line}"
-            )));
-        }
-
-        if a.range != b.range {
-            println!("Left:  {a}\nRight: {b}");
-            return Err(String::from(format!(
-                "Token ranges do not match. {calling_line}"
-            )));
-        }
-
-        if let Constraint::Regex(a) = a.constraint
-            && let Constraint::Regex(b) = b.constraint
-        {
-            if a.as_str() != b.as_str() {
-                println!("Left:  {a}\nRight: {b}");
-                return Err(String::from(format!(
-                    "Token regex constraints do not match. {calling_line}"
-                )));
-            }
-        }
-
-        Ok(())
-    }
-
-    fn cmp_token_arr(a: Vec<Token>, b: Vec<Token>, calling_line: String) -> Result<(), String> {
-        if a.len() != b.len() {
-            println!("Left  ======================>");
-            for (i, token_a) in a.iter().enumerate() {
-                println!("{token_a}");
-            }
-            println!("Right ======================>");
-            for (i, token_b) in b.iter().enumerate() {
-                println!("{token_b}");
-            }
-            println!("End   ======================>");
-
-            return Err(format!("Token amounts do not match. {calling_line}"));
-        }
-
-        for (i, token_a) in a.iter().enumerate() {
-            if let Err(error) = cmp_tokens(token_a.clone(), b[i].clone(), calling_line.clone()) {
-                return Err(format!("Segment depth({}): {}", i + 1, error));
-            }
-            cmp_tokens(token_a.clone(), b[i].clone(), calling_line.clone())?
-        }
-
-        Ok(())
+    #[test]
+    fn test_empty_segment() -> Result<(), String> {
+        let segment = "";
+        let mut tokenizer = SegmentTokenizer::new(segment);
+        cmp_token_arr(
+            vec![],
+            tokenizer.tokenize(),
+            get_line!(),
+        )
     }
 
     #[test]
@@ -522,5 +423,130 @@ mod tests {
         cmp_token_arr(expect, tokenizer.tokenize(), get_line!());
 
         Ok(())
+    }
+
+    fn cmp_tokens(a: Token, b: Token, calling_line: String) -> Result<(), String> {
+        if a.token_type != b.token_type {
+            println!("Left:  {a}\nRight: {b}");
+            return Err(String::from(format!(
+                "Token types do not match. {calling_line}"
+            )));
+        }
+
+        if a.slice != b.slice {
+            println!("Left:  {a}\nRight: {b}");
+            return Err(String::from(format!(
+                "Token slices do not match. {calling_line}"
+            )));
+        }
+
+        if a.range != b.range {
+            println!("Left:  {a}\nRight: {b}");
+            return Err(String::from(format!(
+                "Token ranges do not match. {calling_line}"
+            )));
+        }
+
+        if let Constraint::Regex(a) = a.constraint
+            && let Constraint::Regex(b) = b.constraint
+        {
+            if a.as_str() != b.as_str() {
+                println!("Left:  {a}\nRight: {b}");
+                return Err(String::from(format!(
+                    "Token regex constraints do not match. {calling_line}"
+                )));
+            }
+        }
+
+        Ok(())
+    }
+
+    fn cmp_token_arr(a: Vec<Token>, b: Vec<Token>, calling_line: String) -> Result<(), String> {
+        if a.len() != b.len() {
+            println!("Left  ======================>");
+            for (i, token_a) in a.iter().enumerate() {
+                println!("{token_a}");
+            }
+            println!("Right ======================>");
+            for (i, token_b) in b.iter().enumerate() {
+                println!("{token_b}");
+            }
+            println!("End   ======================>");
+
+            return Err(format!("Token amounts do not match. {calling_line}"));
+        }
+
+        for (i, token_a) in a.iter().enumerate() {
+            if let Err(error) = cmp_tokens(token_a.clone(), b[i].clone(), calling_line.clone()) {
+                return Err(format!("Segment depth({}): {}", i + 1, error));
+            }
+            cmp_tokens(token_a.clone(), b[i].clone(), calling_line.clone())?
+        }
+
+        Ok(())
+    }
+
+    impl Display for Token {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            write!(
+                f,
+                "Token {{ token_type: {}, range: {}, slice: \"{}\", constraint: {} }}",
+                self.token_type,
+                format!("Range {{ {}..{} }}", self.range.start, self.range.end),
+                self.slice,
+                self.constraint,
+            )
+        }
+    }
+
+    impl Display for TokenType {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            match self {
+                TokenType::Static => write!(f, "{}", "TokenType::Static"),
+                TokenType::Variable => write!(f, "{}", "TokenType::Variable"),
+            }
+        }
+    }
+
+    impl Display for Constraint {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            match self {
+                Constraint::Default => write!(f, "{}", "Constraint::Default"),
+                Constraint::Wildcard => write!(f, "{}", "Constraint::Wildcard"),
+                Constraint::Regex(re) => {
+                    write!(f, "{}", format!("Constraint::Regex(\"{}\")", re.as_str()))
+                }
+            }
+        }
+    }
+
+    impl Clone for Token {
+        fn clone(&self) -> Token {
+            Token {
+                token_type: self.token_type.clone(),
+                range: self.range.clone(),
+                slice: self.slice.clone(),
+                constraint: Constraint::Default.clone(),
+            }
+        }
+    }
+
+    impl Clone for TokenType {
+        fn clone(&self) -> TokenType {
+            match self {
+                TokenType::Static => TokenType::Static,
+                TokenType::Variable => TokenType::Variable,
+            }
+        }
+    }
+
+    impl Clone for Constraint {
+        fn clone(&self) -> Constraint {
+            match self {
+                Constraint::Default => Constraint::Default,
+                Constraint::Wildcard => Constraint::Wildcard,
+                Constraint::Regex(regex) => Constraint::Regex(Regex::new(regex.as_str()).unwrap()),
+            }
+        }
     }
 }
