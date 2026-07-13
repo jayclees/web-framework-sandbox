@@ -31,6 +31,9 @@ impl SegmentTokenizer {
         let mut tokens: Vec<Token> = vec![];
 
         for (i, char) in self.segment.chars().enumerate() {
+            // todo It may be possible that self.state_start is greater than i,
+            // todo if so, possibly skip until i == self.state_start
+
             match char {
                 '{' => {
                     // If this is the last character, break loop and
@@ -39,6 +42,30 @@ impl SegmentTokenizer {
                         break;
                     }
 
+                    if self.state == State::InCurly {
+                        // We were already in a curly brace
+                        let prev = tokens.last_mut();
+
+                        if let Some(token) = prev {
+                            match token.token_type {
+                                TokenType::Static => {
+                                    token.range.end = i;
+                                    token.slice = &self.segment[token.range.clone()];
+                                    self.state_start = i;
+                                }
+                                TokenType::Variable => {
+                                    tokens.push(Token::new_var(self.state_start..i, &self.segment));
+                                }
+                            }
+                        } else {
+                            // No prev token
+                            tokens.push(Token::new_var(self.state_start..i, &self.segment));
+                        }
+
+                        continue;
+                    }
+
+                    // Check if previous state (State::Default) has chars to push as static string
                     if i > self.state_start {
                         tokens.push(Token::new_stat(self.state_start..i, &self.segment));
                     }
@@ -57,7 +84,7 @@ impl SegmentTokenizer {
                                     && token.token_type == TokenType::Static
                                 {
                                     // overwrite last token to include the last 2 chars "{}"
-                                    token.range.end += 2;
+                                    token.range.end = i + 1;
                                     token.slice = &self.segment[token.range.clone()];
                                     self.change_state(State::Default, i + 1);
                                 }
@@ -91,7 +118,7 @@ impl SegmentTokenizer {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 enum State {
     Default,
     InCurly,
@@ -149,9 +176,6 @@ mod tests {
 
     impl Display for Token {
         fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-            // token_type
-            // range
-            // slice
             write!(
                 f,
                 "Token {{ token_type: {}, range: {}, slice: \"{}\", constraint: {} }}",
@@ -213,36 +237,48 @@ mod tests {
         }
     }
 
-    fn cmp_tokens(a: Token, b: Token) -> Result<(), String> {
+    fn cmp_tokens(a: Token, b: Token, calling_line: String) -> Result<(), String> {
         if a.token_type != b.token_type {
-            println!("{a}\n{b}");
-            return Err(String::from("Token types do not match."))
+            println!("Left:  {a}\nRight: {b}");
+            return Err(String::from(format!(
+                "Token types do not match. {calling_line}"
+            )));
         }
 
         if a.slice != b.slice {
-            println!("{a}\n{b}");
-            return Err(String::from("Token slices do not match."))
+            println!("Left:  {a}\nRight: {b}");
+            return Err(String::from(format!(
+                "Token slices do not match. {calling_line}"
+            )));
         }
 
         if a.range != b.range {
-            println!("{a}\n{b}");
-            return Err(String::from("Token ranges do not match."))
+            println!("Left:  {a}\nRight: {b}");
+            return Err(String::from(format!(
+                "Token ranges do not match. {calling_line}"
+            )));
         }
 
         if let Constraint::Regex(a) = a.constraint
             && let Constraint::Regex(b) = b.constraint
         {
             if a.as_str() != b.as_str() {
-                return Err(String::from("Token regex constraints do not match."))
+                println!("Left:  {a}\nRight: {b}");
+                return Err(String::from(format!(
+                    "Token regex constraints do not match. {calling_line}"
+                )));
             }
         }
 
         Ok(())
     }
 
-    fn cmp_token_arr(a: Vec<Token>, b: Vec<Token>) -> Result<(), String> {
+    fn cmp_token_arr(a: Vec<Token>, b: Vec<Token>, calling_line: String) -> Result<(), String> {
         for (i, token_a) in a.iter().enumerate() {
-            cmp_tokens(token_a.clone(), b[i].clone())?
+            if let Err(error) = cmp_tokens(token_a.clone(), b[i].clone(), calling_line.clone()) {
+                return Err(format!("Segment depth({}): {}", i + 1, error));
+            }
+            cmp_tokens(token_a.clone(), b[i].clone(), calling_line.clone())?
         }
 
         Ok(())
@@ -255,116 +291,134 @@ mod tests {
         cmp_token_arr(
             vec![Token::new_stat(0..segment.len(), segment)],
             tokenizer.tokenize(),
-        )
-        // cmp_tokens(Token::new_stat(0..segment.len(), segment), vec[0].clone())
+            get_line!(),
+        )?;
 
-        // //
         //
-        // let segment = "{var}";
-        // let mut tokenizer = SegmentTokenizer::new(segment);
-        // let expect = vec![Token::new_var(0..segment.len(), segment)];
-        // assert_eq!(expect, tokenizer.tokenize());
+
+        let segment = "{var}";
+        let mut tokenizer = SegmentTokenizer::new(segment);
+        let expect = vec![Token::new_var(0..segment.len(), segment)];
+
+        cmp_token_arr(expect, tokenizer.tokenize(), get_line!())?;
+
         //
-        // //
+
+        let segment = "{var_1}";
+        let mut tokenizer = SegmentTokenizer::new(segment);
+        let expect = vec![Token::new_var(0..segment.len(), segment)];
+        cmp_token_arr(expect, tokenizer.tokenize(), get_line!())?;
+
         //
-        // let segment = "{var_1}";
-        // let mut tokenizer = SegmentTokenizer::new(segment);
-        // let expect = vec![Token::new_var(0..segment.len(), segment)];
-        // assert_eq!(expect, tokenizer.tokenize());
+
+        let segment = "test-{var1}";
+        let mut tokenizer = SegmentTokenizer::new(segment);
+        let expect = vec![
+            Token::new_stat(0..5, segment),
+            Token::new_var(5..segment.len(), segment),
+        ];
+        cmp_token_arr(expect, tokenizer.tokenize(), get_line!())?;
+
         //
-        // //
+
+        let segment = "{var}-end";
+        let mut tokenizer = SegmentTokenizer::new(segment);
+        let expect = vec![
+            Token::new_var(0..5, segment),
+            Token::new_stat(5..segment.len(), segment),
+        ];
+        cmp_token_arr(expect, tokenizer.tokenize(), get_line!())?;
+
         //
-        // let segment = "test-{var1}";
-        // let mut tokenizer = SegmentTokenizer::new(segment);
-        // let expect = vec![
-        //     Token::new_stat(0..5, segment),
-        //     Token::new_var(5..segment.len(), segment),
-        // ];
-        // assert_eq!(expect, tokenizer.tokenize());
+
+        let segment = "test-{var1}-t2";
+        let mut tokenizer = SegmentTokenizer::new(segment);
+        let expect = vec![
+            Token::new_stat(0..5, segment),
+            Token::new_var(5..11, segment),
+            Token::new_stat(11..segment.len(), segment),
+        ];
+        cmp_token_arr(expect, tokenizer.tokenize(), get_line!())?;
+
         //
-        // //
+
+        let segment = "test-{var1}t2{var_2}";
+        let mut tokenizer = SegmentTokenizer::new(segment);
+        let expect = vec![
+            Token::new_stat(0..5, segment),
+            Token::new_var(5..11, segment),
+            Token::new_stat(11..13, segment),
+            Token::new_var(13..segment.len(), segment),
+        ];
+        cmp_token_arr(expect, tokenizer.tokenize(), get_line!())?;
+
         //
-        // let segment = "{var}-end";
-        // let mut tokenizer = SegmentTokenizer::new(segment);
-        // let expect = vec![
-        //     Token::new_var(0..5, segment),
-        //     Token::new_stat(5..segment.len(), segment),
-        // ];
-        // assert_eq!(expect, tokenizer.tokenize());
+
+        let segment = "test-{var1}t2{var_2}-end";
+        let mut tokenizer = SegmentTokenizer::new(segment);
+        let expect = vec![
+            Token::new_stat(0..5, segment),
+            Token::new_var(5..11, segment),
+            Token::new_stat(11..13, segment),
+            Token::new_var(13..20, segment),
+            Token::new_stat(20..segment.len(), segment),
+        ];
+        cmp_token_arr(expect, tokenizer.tokenize(), get_line!())?;
+
         //
-        // //
+
+        // Treat open brace as static if end of str
+        let segment = "test{";
+        let mut tokenizer = SegmentTokenizer::new(segment);
+        let expect = vec![Token::new_stat(0..5, segment)];
+        cmp_token_arr(expect, tokenizer.tokenize(), get_line!())?;
+
         //
-        // let segment = "test-{var1}-t2";
-        // let mut tokenizer = SegmentTokenizer::new(segment);
-        // let expect = vec![
-        //     Token::new_stat(0..5, segment),
-        //     Token::new_var(5..11, segment),
-        //     Token::new_stat(11..segment.len(), segment),
-        // ];
-        // assert_eq!(expect, tokenizer.tokenize());
+
+        // Treat empty curly braces as static chars
+        let segment = "test{}";
+        let mut tokenizer = SegmentTokenizer::new(segment);
+        let expect = vec![Token::new_stat(0..6, segment)];
+        cmp_token_arr(expect, tokenizer.tokenize(), get_line!())?;
+
         //
-        // //
+
+        // Treat close brace as static if end of str
+        let segment = "test}";
+        let mut tokenizer = SegmentTokenizer::new(segment);
+        let expect = vec![Token::new_stat(0..5, segment)];
+        cmp_token_arr(expect, tokenizer.tokenize(), get_line!())?;
+
         //
-        // let segment = "test-{var1}t2{var_2}";
-        // let mut tokenizer = SegmentTokenizer::new(segment);
-        // let expect = vec![
-        //     Token::new_stat(0..5, segment),
-        //     Token::new_var(5..11, segment),
-        //     Token::new_stat(11..13, segment),
-        //     Token::new_var(13..segment.len(), segment),
-        // ];
-        // assert_eq!(expect, tokenizer.tokenize());
+
+        let segment = "{}";
+        let mut tokenizer = SegmentTokenizer::new(segment);
+        let expect = vec![Token::new_stat(0..2, segment)];
+        cmp_token_arr(expect, tokenizer.tokenize(), get_line!())?;
+
         //
-        // //
-        //
-        // let segment = "test-{var1}t2{var_2}-end";
-        // let mut tokenizer = SegmentTokenizer::new(segment);
-        // let expect = vec![
-        //     Token::new_stat(0..5, segment),
-        //     Token::new_var(5..11, segment),
-        //     Token::new_stat(11..13, segment),
-        //     Token::new_var(13..20, segment),
-        //     Token::new_stat(20..segment.len(), segment),
-        // ];
-        // assert_eq!(expect, tokenizer.tokenize());
-        //
-        // //
-        //
-        // // Treat open brace as static if end of str
-        // let segment = "test{";
-        // let mut tokenizer = SegmentTokenizer::new(segment);
-        // let expect = vec![Token::new_stat(0..5, segment)];
-        // assert_eq!(expect, tokenizer.tokenize());
-        //
-        // //
-        //
-        // // Treat empty curly braces as static chars
-        // let segment = "test{}";
-        // let mut tokenizer = SegmentTokenizer::new(segment);
-        // let expect = vec![Token::new_stat(0..6, segment)];
-        // assert_eq!(expect, tokenizer.tokenize());
-        //
-        // //
-        //
-        // // Treat close brace as static if end of str
-        // let segment = "test}";
-        // let mut tokenizer = SegmentTokenizer::new(segment);
-        // let expect = vec![Token::new_stat(0..5, segment)];
-        // assert_eq!(expect, tokenizer.tokenize());
-        //
-        // //
-        //
-        // let segment = "{}";
-        // let mut tokenizer = SegmentTokenizer::new(segment);
-        // let expect = vec![Token::new_stat(0..2, segment)];
-        // assert_eq!(expect, tokenizer.tokenize());
-        //
-        // //
-        //
-        // // todo panic if we see something like this?
-        // let segment = "{{}";
-        // let mut tokenizer = SegmentTokenizer::new(segment);
-        // let expect = vec![Token::new_stat(0..2, segment)];
-        // assert_eq!(expect, tokenizer.tokenize());
+
+        let segment = "{{}";
+        let mut tokenizer = SegmentTokenizer::new(segment);
+        let expect = vec![Token::new_stat(0..3, segment)];
+        cmp_token_arr(expect, tokenizer.tokenize(), get_line!())?;
+
+        let segment = "test{test{actual_var}";
+        let mut tokenizer = SegmentTokenizer::new(segment);
+        let expect = vec![
+            Token::new_stat(0..9, segment),
+            Token::new_var(9..segment.len(), segment),
+        ];
+        cmp_token_arr(expect, tokenizer.tokenize(), get_line!())?;
+
+        Ok(())
     }
+
+    macro_rules! get_line {
+        () => {
+            format!("{}:{}:{}", file!(), line!(), column!())
+        };
+    }
+
+    use get_line;
 }
