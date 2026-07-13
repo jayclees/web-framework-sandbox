@@ -5,7 +5,7 @@ use std::sync::LazyLock;
 use hyper::Method;
 use regex::Regex;
 use crate::action::Action;
-use crate::routing::split_segments;
+use crate::routing::{split_segments, SegmentTokenizer, Token, TokenType};
 
 static REG: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\{[^_][a-zA-Z0-9_]*[a-zA-Z0-9]}").unwrap());
@@ -56,9 +56,9 @@ impl Route {
 
     pub fn constrain(mut self, parameter: &'static str, pattern: &'static str) -> Route {
         for segment in &mut self.segments {
-            for variable in &mut segment.variables {
-                if variable.handle == parameter {
-                    variable.constrain(pattern);
+            for token in &mut segment.tokens {
+                if token.token_type == TokenType::Variable {
+                    // token.constrain(pattern);
                     break;
                 }
             }
@@ -68,11 +68,11 @@ impl Route {
 
     pub fn wildcard(mut self, parameter: &'static str, enable: bool) -> Route {
         for segment in &mut self.segments {
-            for variable in &mut segment.variables {
-                if variable.handle == parameter {
-                    variable.wildcard(enable);
+            for token in &mut segment.tokens {
+                if token.token_type == TokenType::Variable {
+                    // token.wildcard(enable);
                     break;
-                }
+                };
             }
         }
         self
@@ -114,35 +114,35 @@ impl Route {
             if let Some(req_seg) = req_seg
                 && let Some(rou_seg) = rou_seg
             {
-                let has_variables = rou_seg.variables.len() > 0;
-
-                if has_variables {
-                    for variable in &rou_seg.variables {
-                        let start = variable.range.start;
-                        let start_is_match = req_seg[..start] == rou_seg.segment[..start];
-
-                        if ! start_is_match {
-                            is_match = false;
-                            break;
-                        }
-
-                        is_match = match &variable.constraint {
-                            Constraint::Default => true,
-                            Constraint::Wildcard(enabled) => {
-                                if *enabled {
-                                    // Return true out of matches function to mark as the resolved route
-                                    return true;
-                                }
-                                false
-                            }
-                            Constraint::Regex(pattern) => {
-                                false
-                            },
-                        }
-                    }
-                } else {
-                    is_match = *req_seg == rou_seg.segment;
-                }
+                // let has_variables = rou_seg.variables.len() > 0;
+                //
+                // if has_variables {
+                //     for variable in &rou_seg.variables {
+                //         let start = variable.range.start;
+                //         let start_is_match = req_seg[..start] == rou_seg.segment[..start];
+                //
+                //         if ! start_is_match {
+                //             is_match = false;
+                //             break;
+                //         }
+                //
+                //         is_match = match &variable.constraint {
+                //             Constraint::Default => true,
+                //             Constraint::Wildcard(enabled) => {
+                //                 if *enabled {
+                //                     // Return true out of matches function to mark as the resolved route
+                //                     return true;
+                //                 }
+                //                 false
+                //             }
+                //             Constraint::Regex(pattern) => {
+                //                 false
+                //             },
+                //         }
+                //     }
+                // } else {
+                //     is_match = *req_seg == rou_seg.segment;
+                // }
 
                 if !is_match {
                     break;
@@ -159,23 +159,14 @@ impl Route {
 #[derive(Debug)]
 struct RouteSegment {
     segment: &'static str,
-    variables: Vec<RouteVariable>,
+    tokens: Vec<Token>,
 }
 
 impl RouteSegment {
     pub fn new(segment: &'static str) -> RouteSegment {
-        let matches: Vec<RouteVariable> = REG
-            .find_iter(segment)
-            .map(|m| RouteVariable {
-                handle: VAR_DELIMITER.replace_all(m.as_str(), ""),
-                range: m.range(),
-                constraint: Constraint::Default,
-            })
-            .collect();
-
         RouteSegment {
             segment,
-            variables: matches,
+            tokens: SegmentTokenizer::new(segment).tokenize(),
         }
     }
 }
