@@ -203,7 +203,7 @@ mod tests {
     use std::fmt::{Display, Formatter};
 
     #[test]
-    fn test_empty_segment() -> Result<(), String> {
+    fn empty_segment() -> Result<(), String> {
         let segment = "";
         let mut tokenizer = SegmentTokenizer::new(segment);
         let expect = vec![Token::new_stat(0..0, "")];
@@ -211,7 +211,7 @@ mod tests {
     }
 
     #[test]
-    fn test_single_stat() -> Result<(), String> {
+    fn single_stat() -> Result<(), String> {
         let segment = "test";
         let mut tokenizer = SegmentTokenizer::new(segment);
         cmp_token_arr(
@@ -222,7 +222,7 @@ mod tests {
     }
 
     #[test]
-    fn test_single_var() -> Result<(), String> {
+    fn single_var() -> Result<(), String> {
         let segment = "{var}";
         let mut tokenizer = SegmentTokenizer::new(segment);
         let expect = vec![Token::new_var(0..segment.len(), segment)];
@@ -230,7 +230,7 @@ mod tests {
     }
 
     #[test]
-    fn test_underscore_number_in_var() -> Result<(), String> {
+    fn underscore_number_in_var() -> Result<(), String> {
         let segment = "{var_1}";
         let mut tokenizer = SegmentTokenizer::new(segment);
         let expect = vec![Token::new_var(0..segment.len(), segment)];
@@ -238,7 +238,7 @@ mod tests {
     }
 
     #[test]
-    fn test_dash_in_stat() -> Result<(), String> {
+    fn dash_in_stat() -> Result<(), String> {
         let segment = "test-{var1}";
         let mut tokenizer = SegmentTokenizer::new(segment);
         let expect = vec![
@@ -249,7 +249,7 @@ mod tests {
     }
 
     #[test]
-    fn test_var_to_stat() -> Result<(), String> {
+    fn var_to_stat() -> Result<(), String> {
         let segment = "{var}-end";
         let mut tokenizer = SegmentTokenizer::new(segment);
         let expect = vec![
@@ -260,7 +260,7 @@ mod tests {
     }
 
     #[test]
-    fn test_stat_var_stat() -> Result<(), String> {
+    fn stat_var_stat() -> Result<(), String> {
         let segment = "test-{var1}-t2";
         let mut tokenizer = SegmentTokenizer::new(segment);
         let expect = vec![
@@ -272,7 +272,7 @@ mod tests {
     }
 
     #[test]
-    fn test_stat_var_stat_var() -> Result<(), String> {
+    fn stat_var_stat_var() -> Result<(), String> {
         let segment = "test-{var1}t2{var_2}";
         let mut tokenizer = SegmentTokenizer::new(segment);
         let expect = vec![
@@ -285,7 +285,7 @@ mod tests {
     }
 
     #[test]
-    fn test_stat_var_stat_var_stat() -> Result<(), String> {
+    fn stat_var_stat_var_stat() -> Result<(), String> {
         let segment = "test-{var1}t2{var_2}-end";
         let mut tokenizer = SegmentTokenizer::new(segment);
         let expect = vec![
@@ -299,7 +299,7 @@ mod tests {
     }
 
     #[test]
-    fn test_stranded_open_curly() -> Result<(), String> {
+    fn stranded_open_curly() -> Result<(), String> {
         // Treat open brace as static if end of str
         let segment = "test{";
         let mut tokenizer = SegmentTokenizer::new(segment);
@@ -308,7 +308,7 @@ mod tests {
     }
 
     #[test]
-    fn test_stranded_close_curly() -> Result<(), String> {
+    fn stranded_close_curly() -> Result<(), String> {
         // Treat close brace as static if end of str
         let segment = "test}";
         let mut tokenizer = SegmentTokenizer::new(segment);
@@ -317,7 +317,7 @@ mod tests {
     }
 
     #[test]
-    fn test_empty_curly() -> Result<(), String> {
+    fn empty_curly() -> Result<(), String> {
         let segment = "{}";
         let mut tokenizer = SegmentTokenizer::new(segment);
         let expect = vec![Token::new_stat(0..2, segment)];
@@ -325,7 +325,7 @@ mod tests {
     }
 
     #[test]
-    fn test_empty_curly_with_leading_stat() -> Result<(), String> {
+    fn empty_curly_with_leading_stat() -> Result<(), String> {
         // Treat empty curly braces as static chars
         let segment = "test{}";
         let mut tokenizer = SegmentTokenizer::new(segment);
@@ -334,7 +334,7 @@ mod tests {
     }
 
     #[test]
-    fn test_empty_curly_with_trailing_stat() -> Result<(), String> {
+    fn empty_curly_with_trailing_stat() -> Result<(), String> {
         // Treat empty curly braces as static chars
         let segment = "{}test";
         let mut tokenizer = SegmentTokenizer::new(segment);
@@ -343,7 +343,7 @@ mod tests {
     }
 
     #[test]
-    fn test_stranded_open_curly_into_var() -> Result<(), String> {
+    fn stranded_open_curly_into_var() -> Result<(), String> {
         let segment = "{test{actual_var}";
         let mut tokenizer = SegmentTokenizer::new(segment);
         let expect = vec![
@@ -354,7 +354,7 @@ mod tests {
     }
 
     #[test]
-    fn test_stranded_open_curly_into_var_2() -> Result<(), String> {
+    fn stranded_open_curly_into_var_2() -> Result<(), String> {
         let segment = "test{test{actual_var}";
         let mut tokenizer = SegmentTokenizer::new(segment);
         let expect = vec![
@@ -365,7 +365,7 @@ mod tests {
     }
 
     #[test]
-    fn test_stranded_open_curly_into_var_3() -> Result<(), String> {
+    fn stranded_open_curly_into_var_3() -> Result<(), String> {
         let segment = "test{{actual_var}";
         let mut tokenizer = SegmentTokenizer::new(segment);
         let expect = vec![
@@ -376,7 +376,7 @@ mod tests {
     }
 
     #[test]
-    fn test_stranded_open_into_empty_curlies() -> Result<(), String> {
+    fn stranded_open_into_empty_curlies() -> Result<(), String> {
         let segment = "{{}";
         let mut tokenizer = SegmentTokenizer::new(segment);
         let expect = vec![Token::new_stat(0..3, segment)];
@@ -384,23 +384,33 @@ mod tests {
     }
 
     #[test]
-    fn test_empty_curlies_wrapped_by_stranded_curlies() -> Result<(), String> {
+    fn empty_curlies_wrapped_by_stranded_curlies() -> Result<(), String> {
         let segment = "{{}}";
         let mut tokenizer = SegmentTokenizer::new(segment);
         let expect = vec![Token::new_stat(0..4, segment)];
-        cmp_token_arr(expect, tokenizer.tokenize(), get_line!());
-
-        Ok(())
+        cmp_token_arr(expect, tokenizer.tokenize(), get_line!())
     }
 
     #[test]
-    fn test_empty_curlies_wrapped_by_stranded_curlies_2() -> Result<(), String> {
+    fn empty_curlies_wrapped_by_stranded_curlies_2() -> Result<(), String> {
         let segment = "{{{}}}";
         let mut tokenizer = SegmentTokenizer::new(segment);
-        let expect = vec![Token::new_stat(0..4, segment)];
-        cmp_token_arr(expect, tokenizer.tokenize(), get_line!());
+        let expect = vec![Token::new_stat(0..6, segment)];
+        cmp_token_arr(expect, tokenizer.tokenize(), get_line!())
+    }
 
-        Ok(())
+    #[test]
+    fn author_post_id_post_slug_segment() -> Result<(), String> {
+        let segment = "{author}.{post_id}.{slug}";
+        let mut tokenizer = SegmentTokenizer::new(segment);
+        let expect = vec![
+            Token::new_var(0..8, segment),
+            Token::new_stat(8..9, segment),
+            Token::new_var(9..18, segment),
+            Token::new_stat(18..19, segment),
+            Token::new_var(19..segment.len(), segment),
+        ];
+        cmp_token_arr(expect, tokenizer.tokenize(), get_line!())
     }
 
     fn cmp_tokens(a: Token, b: Token, calling_line: String) -> Result<(), String> {
