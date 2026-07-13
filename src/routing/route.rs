@@ -1,5 +1,6 @@
 use crate::action::Action;
-use crate::routing::{split_segments, SegmentTokenizer, Token, TokenType};
+use crate::routing::{split_segments};
+use crate::routing::tokenizer::{SegmentTokenizer, Token, TokenType};
 use hyper::Method;
 use regex::Regex;
 use std::borrow::Cow;
