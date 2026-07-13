@@ -1,15 +1,16 @@
+use std::borrow::Cow;
 use crate::action::Action;
 use crate::error::HttpError;
 use hyper::body::Incoming;
 use hyper::{Method, Request};
 use regex::Regex;
-use std::collections::HashMap;
 use std::ops::Range;
 use std::str::Split;
 use std::sync::LazyLock;
 
 static REG: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\{[^_][a-zA-Z0-9_]*[a-zA-Z0-9]}").unwrap());
+static VAR_DELIMITER: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(\A\{)|(})\z").unwrap());
 
 #[derive(Debug)]
 pub struct Router {
@@ -160,14 +161,11 @@ impl Router {
 
 #[derive(Debug)]
 pub struct Route {
-    // todo implement route names
     name: Option<&'static str>,
-    // todo use http::Method(Inner) enum
     method: Method,
     path: &'static str,
     segments: Vec<RouteSegment>,
     action: Box<dyn Action + 'static>,
-    constraints: HashMap<&'static str, Regex>,
 }
 
 impl Route {
@@ -179,7 +177,6 @@ impl Route {
             path,
             segments: process_segments(split_segments(path)),
             action: Box::new(action),
-            constraints: HashMap::new(),
         }
     }
 
@@ -200,11 +197,27 @@ impl Route {
         self.name
     }
 
-    pub fn constrain(mut self, parameter: &'static str, pattern: &str) -> Route {
-        self.constraints.insert(
-            parameter,
-            Regex::new(pattern).expect("Regex failed to compile."),
-        );
+    pub fn constrain(mut self, parameter: &'static str, pattern: &'static str) -> Route {
+        for segment in &mut self.segments {
+            for variable in &mut segment.variables {
+                if variable.handle == parameter {
+                    variable.constrain(pattern);
+                    break;
+                }
+            }
+        }
+        self
+    }
+
+    pub fn wildcard(mut self, parameter: &'static str, enable: bool) -> Route {
+        for segment in &mut self.segments {
+            for variable in &mut segment.variables {
+                if variable.handle == parameter {
+                    variable.wildcard(enable);
+                    break;
+                }
+            }
+        }
         self
     }
 
@@ -247,10 +260,29 @@ impl Route {
                 let has_variables = rou_seg.variables.len() > 0;
 
                 if has_variables {
-                    // req: app-(some-random-string/test)
-                    // rou: app-{wildcard}
+                    println!("after has_variables check");
+                    for variable in &rou_seg.variables {
+                        dbg!(&variable);
+                        match variable.constraint {
+                            Constraint::Default => {
+                                is_match = true
+                            }
+                            Constraint::Wildcard(enabled) => {
+                                if enabled {
+                                    let start = variable.range.start;
+                                    if req_seg[..start] == rou_seg.segment[..start] {
+                                        // Return true out of matches function to mark as the resolved route
+                                        return true;
+                                    }
+                                }
+                            }
+                            Constraint::Regex(_) => {
+                                // todo
+                            }
+                        }
+                    }
                 } else {
-                    is_match = *req_seg == rou_seg.string;
+                    is_match = *req_seg == rou_seg.segment;
                 }
 
                 if !is_match {
@@ -267,7 +299,7 @@ impl Route {
 
 #[derive(Debug)]
 struct RouteSegment {
-    string: &'static str,
+    segment: &'static str,
     variables: Vec<RouteVariable>,
 }
 
@@ -276,22 +308,45 @@ impl RouteSegment {
         let matches: Vec<RouteVariable> = REG
             .find_iter(segment)
             .map(|m| {
-                (m.range(), m.as_str());
                 RouteVariable {
-                    handle: m.as_str(),
+                    handle: VAR_DELIMITER.replace_all(m.as_str(), ""),
                     range: m.range(),
+                    constraint: Constraint::Default,
                 }
             })
             .collect();
 
-        RouteSegment { string: segment, variables: matches }
+        RouteSegment {
+            segment,
+            variables: matches,
+        }
     }
 }
 
 #[derive(Debug)]
 struct RouteVariable {
-    handle: &'static str,
+    handle: Cow<'static, str>,
     range: Range<usize>,
+    constraint: Constraint,
+}
+
+impl RouteVariable {
+    fn wildcard(&mut self, enable: bool) -> &RouteVariable {
+        self.constraint = Constraint::Wildcard(enable);
+        self
+    }
+
+    fn constrain(&mut self, pattern: &'static str) -> &RouteVariable {
+        self.constraint = Constraint::Regex(Regex::new(pattern).unwrap());
+        self
+    }
+}
+
+#[derive(Debug)]
+enum Constraint {
+    Default,
+    Wildcard(bool),
+    Regex(Regex),
 }
 
 /// Since we want to split the route definition path and the request
