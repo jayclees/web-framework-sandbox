@@ -15,7 +15,7 @@ pub fn register_routes(router: &mut Router) -> () {
     // router.get("/user/{user}/post/{post}", ShowUser, None);
     router.get("/error", ShowErrorPage, None);
     router.get(
-        "/app-{wildcard}",
+        "/home/app-{wildcard}",
         ServeApp,
         Some(|route| route.wildcard("wildcard", true)),
     );

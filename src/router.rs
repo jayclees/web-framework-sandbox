@@ -260,24 +260,21 @@ impl Route {
                 let has_variables = rou_seg.variables.len() > 0;
 
                 if has_variables {
-                    println!("after has_variables check");
                     for variable in &rou_seg.variables {
-                        dbg!(&variable);
-                        match variable.constraint {
+                        is_match = match variable.constraint {
                             Constraint::Default => {
-                                is_match = true
+                                true
                             }
                             Constraint::Wildcard(enabled) => {
-                                if enabled {
-                                    let start = variable.range.start;
-                                    if req_seg[..start] == rou_seg.segment[..start] {
-                                        // Return true out of matches function to mark as the resolved route
-                                        return true;
-                                    }
+                                let start = variable.range.start;
+                                if enabled && req_seg[..start] == rou_seg.segment[..start] {
+                                    // Return true out of matches function to mark as the resolved route
+                                    return true;
                                 }
+                                false
                             }
                             Constraint::Regex(_) => {
-                                // todo
+                                false
                             }
                         }
                     }
@@ -363,12 +360,4 @@ fn process_segments(segments: Split<'static, &'static str>) -> Vec<RouteSegment>
     }
 
     result
-}
-
-fn is_variable(segment: &str) -> bool {
-    todo!()
-}
-
-fn is_model(segment: &str) -> bool {
-    todo!()
 }
