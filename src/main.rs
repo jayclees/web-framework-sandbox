@@ -3,14 +3,14 @@ mod app;
 mod entity;
 mod error;
 mod helper;
-mod router;
 mod routes;
+mod routing;
 
 use crate::app::App;
 use crate::error::register_panic_hook;
-use crate::router::Router;
 use crate::routes::register_routes;
 use minijinja::{path_loader, Environment};
+use routing::router::Router;
 use sea_orm::{ConnectOptions, Database};
 use std::env;
 use std::error::Error;

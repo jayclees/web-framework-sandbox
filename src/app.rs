@@ -1,5 +1,5 @@
 use crate::error::HttpError;
-use crate::router::Router;
+use crate::routing::router::Router;
 use futures::FutureExt;
 use http_body_util::Full;
 use hyper::body::{Bytes, Incoming};
@@ -147,10 +147,7 @@ async fn handle_request(
     };
 
     // attempting to catch panics within app.dispatch()
-    match AssertUnwindSafe(app.dispatch(request))
-        .catch_unwind()
-        .await
-    {
+    match AssertUnwindSafe(app.dispatch(request)).catch_unwind().await {
         Ok(option) => {
             match option {
                 Some(result) => {

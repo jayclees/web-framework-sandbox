@@ -1,163 +1,16 @@
 use std::borrow::Cow;
-use crate::action::Action;
-use crate::error::HttpError;
-use hyper::body::Incoming;
-use hyper::{Method, Request};
-use regex::Regex;
 use std::ops::Range;
 use std::str::Split;
 use std::sync::LazyLock;
+use hyper::Method;
+use regex::Regex;
+use crate::action::Action;
+use crate::routing::split_segments;
 
 static REG: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\{[^_][a-zA-Z0-9_]*[a-zA-Z0-9]}").unwrap());
+
 static VAR_DELIMITER: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(\A\{)|(})\z").unwrap());
-
-#[derive(Debug)]
-pub struct Router {
-    pub routes: Vec<Route>,
-}
-
-impl Router {
-    pub fn new(register_routes: fn(&mut Router)) -> Router {
-        let mut router = Router { routes: Vec::new() };
-
-        register_routes(&mut router);
-
-        router
-    }
-
-    pub fn add<A: Action + 'static>(
-        &mut self,
-        method: Method,
-        path: &'static str,
-        action: A,
-        modifier: Option<fn(Route) -> Route>,
-    ) -> &mut Router {
-        let mut route = Route::new(method, path, action);
-
-        if let Some(modifier) = modifier {
-            route = modifier(route);
-        }
-
-        self.routes.push(route);
-
-        self
-    }
-
-    pub fn get<A: Action + 'static>(
-        &mut self,
-        path: &'static str,
-        action: A,
-        modifier: Option<fn(Route) -> Route>,
-    ) -> &mut Router {
-        self.add(Method::GET, path, action, modifier);
-
-        self
-    }
-
-    pub fn post<A: Action + 'static>(
-        &mut self,
-        path: &'static str,
-        action: A,
-        modifier: Option<fn(Route) -> Route>,
-    ) -> &mut Router {
-        self.add(Method::POST, path, action, modifier);
-
-        self
-    }
-
-    pub fn patch<A: Action + 'static>(
-        &mut self,
-        path: &'static str,
-        action: A,
-        modifier: Option<fn(Route) -> Route>,
-    ) -> &mut Router {
-        self.add(Method::PATCH, path, action, modifier);
-
-        self
-    }
-
-    pub fn put<A: Action + 'static>(
-        &mut self,
-        path: &'static str,
-        action: A,
-        modifier: Option<fn(Route) -> Route>,
-    ) -> &mut Router {
-        self.add(Method::PUT, path, action, modifier);
-
-        self
-    }
-
-    pub fn delete<A: Action + 'static>(
-        &mut self,
-        path: &'static str,
-        action: A,
-        modifier: Option<fn(Route) -> Route>,
-    ) -> &mut Router {
-        self.add(Method::DELETE, path, action, modifier);
-
-        self
-    }
-
-    pub fn head<A: Action + 'static>(
-        &mut self,
-        path: &'static str,
-        action: A,
-        modifier: Option<fn(Route) -> Route>,
-    ) -> &mut Router {
-        self.add(Method::HEAD, path, action, modifier);
-
-        self
-    }
-
-    pub fn connect<A: Action + 'static>(
-        &mut self,
-        path: &'static str,
-        action: A,
-        modifier: Option<fn(Route) -> Route>,
-    ) -> &mut Router {
-        self.add(Method::CONNECT, path, action, modifier);
-
-        self
-    }
-
-    pub fn options<A: Action + 'static>(
-        &mut self,
-        path: &'static str,
-        action: A,
-        modifier: Option<fn(Route) -> Route>,
-    ) -> &mut Router {
-        self.add(Method::OPTIONS, path, action, modifier);
-
-        self
-    }
-
-    pub fn trace<A: Action + 'static>(
-        &mut self,
-        path: &'static str,
-        action: A,
-        modifier: Option<fn(Route) -> Route>,
-    ) -> &mut Router {
-        self.add(Method::TRACE, path, action, modifier);
-
-        self
-    }
-
-    pub fn resolve(&self, request: &Request<Incoming>) -> Result<Option<&Route>, HttpError> {
-        // todo: handle constrained route parameter paths (potential wildcards)
-        for route in &self.routes {
-            if route.matches(request.uri().path()) {
-                return if request.method() != route.method {
-                    Err(HttpError::new(405, "Method not allowed".to_string()))
-                } else {
-                    Ok(Some(route))
-                };
-            }
-        }
-
-        Ok(None)
-    }
-}
 
 #[derive(Debug)]
 pub struct Route {
@@ -195,6 +48,10 @@ impl Route {
 
     pub fn get_name(&self) -> Option<&'static str> {
         self.name
+    }
+
+    pub fn get_method(&self) -> &Method {
+        &self.method
     }
 
     pub fn constrain(mut self, parameter: &'static str, pattern: &'static str) -> Route {
@@ -262,9 +119,7 @@ impl Route {
                 if has_variables {
                     for variable in &rou_seg.variables {
                         is_match = match variable.constraint {
-                            Constraint::Default => {
-                                true
-                            }
+                            Constraint::Default => true,
                             Constraint::Wildcard(enabled) => {
                                 let start = variable.range.start;
                                 if enabled && req_seg[..start] == rou_seg.segment[..start] {
@@ -273,9 +128,7 @@ impl Route {
                                 }
                                 false
                             }
-                            Constraint::Regex(_) => {
-                                false
-                            }
+                            Constraint::Regex(_) => false,
                         }
                     }
                 } else {
@@ -304,12 +157,10 @@ impl RouteSegment {
     pub fn new(segment: &'static str) -> RouteSegment {
         let matches: Vec<RouteVariable> = REG
             .find_iter(segment)
-            .map(|m| {
-                RouteVariable {
-                    handle: VAR_DELIMITER.replace_all(m.as_str(), ""),
-                    range: m.range(),
-                    constraint: Constraint::Default,
-                }
+            .map(|m| RouteVariable {
+                handle: VAR_DELIMITER.replace_all(m.as_str(), ""),
+                range: m.range(),
+                constraint: Constraint::Default,
             })
             .collect();
 
@@ -344,12 +195,6 @@ enum Constraint {
     Default,
     Wildcard(bool),
     Regex(Regex),
-}
-
-/// Since we want to split the route definition path and the request
-/// instance path the same way we will extract it into a helper fn
-fn split_segments<'a>(path: &'a str) -> Split<'a, &'static str> {
-    path.split("/")
 }
 
 fn process_segments(segments: Split<'static, &'static str>) -> Vec<RouteSegment> {

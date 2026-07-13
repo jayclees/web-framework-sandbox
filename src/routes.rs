@@ -2,7 +2,7 @@ use crate::action::pages::{
     ServeApp, ShowAbout, ShowDeeplyNestedRoute, ShowErrorPage, ShowHtml, ShowJson, ShowLanding,
     ShowNumberArray, ShowUser,
 };
-use crate::router::Router;
+use crate::routing::router::Router;
 
 pub fn register_routes(router: &mut Router) -> () {
     router.get("/", ShowLanding, Some(|route| route.name("landing")));
