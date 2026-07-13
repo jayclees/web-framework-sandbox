@@ -17,6 +17,6 @@ pub fn register_routes(router: &mut Router) -> () {
     router.get(
         "/home/app-{wildcard}",
         ServeApp,
-        Some(|route| route.wildcard("wildcard", true)),
+        Some(|route| route.constrain("wildcard", "asdf")),
     );
 }

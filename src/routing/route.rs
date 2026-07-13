@@ -118,17 +118,26 @@ impl Route {
 
                 if has_variables {
                     for variable in &rou_seg.variables {
-                        is_match = match variable.constraint {
+                        let start = variable.range.start;
+                        let start_is_match = req_seg[..start] == rou_seg.segment[..start];
+
+                        if ! start_is_match {
+                            is_match = false;
+                            break;
+                        }
+
+                        is_match = match &variable.constraint {
                             Constraint::Default => true,
                             Constraint::Wildcard(enabled) => {
-                                let start = variable.range.start;
-                                if enabled && req_seg[..start] == rou_seg.segment[..start] {
+                                if *enabled {
                                     // Return true out of matches function to mark as the resolved route
                                     return true;
                                 }
                                 false
                             }
-                            Constraint::Regex(_) => false,
+                            Constraint::Regex(pattern) => {
+                                false
+                            },
                         }
                     }
                 } else {
