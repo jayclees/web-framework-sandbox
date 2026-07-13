@@ -45,22 +45,24 @@ impl SegmentTokenizer {
                     if self.state == State::InCurly {
                         // We were already in a curly brace
                         let prev = tokens.last_mut();
-
                         if let Some(token) = prev {
                             match token.token_type {
+                                // Append to the previous token
                                 TokenType::Static => {
                                     token.range.end = i;
                                     token.slice = &self.segment[token.range.clone()];
-                                    self.state_start = i;
                                 }
+                                // Previous token already closed, push new static token instead
                                 TokenType::Variable => {
                                     tokens.push(Token::new_var(self.state_start..i, &self.segment));
                                 }
                             }
                         } else {
                             // No prev token
-                            tokens.push(Token::new_var(self.state_start..i, &self.segment));
+                            tokens.push(Token::new_stat(self.state_start..i, &self.segment));
                         }
+
+                        self.state_start = i;
 
                         continue;
                     }
@@ -73,6 +75,33 @@ impl SegmentTokenizer {
                     self.change_state(State::InCurly, i);
                 }
                 '}' => {
+                    if self.state == State::Default {
+                        // if prev token and token is static, push to it
+                        // if prev token and token is var, create new token
+                        // if no prev token, create new token
+                        let prev = tokens.last_mut();
+                        if let Some(token) = prev {
+                            match token.token_type {
+                                // Append to the previous token
+                                TokenType::Static => {
+                                    token.range.end = i + 1;
+                                    token.slice = &self.segment[token.range.clone()];
+                                }
+                                // Previous token already closed, push new static token instead
+                                TokenType::Variable => {
+                                    tokens.push(Token::new_var(self.state_start..i + 1, &self.segment));
+                                }
+                            }
+                        } else {
+                            // No prev token
+                            tokens.push(Token::new_stat(self.state_start..i + 1, &self.segment));
+                        }
+
+                        self.state_start = i + 1;
+
+                        continue;
+                    }
+
                     match self.state {
                         State::InCurly => {
                             if self.state_start + 1 == i {
@@ -274,6 +303,20 @@ mod tests {
     }
 
     fn cmp_token_arr(a: Vec<Token>, b: Vec<Token>, calling_line: String) -> Result<(), String> {
+        if a.len() != b.len() {
+            println!("Left  ======================>");
+            for (i, token_a) in a.iter().enumerate() {
+                println!("{token_a}");
+            }
+            println!("Right ======================>");
+            for (i, token_b) in b.iter().enumerate() {
+                println!("{token_b}");
+            }
+            println!("End   ======================>");
+
+            return Err(format!("Token amounts do not match. {calling_line}"));
+        }
+
         for (i, token_a) in a.iter().enumerate() {
             if let Err(error) = cmp_tokens(token_a.clone(), b[i].clone(), calling_line.clone()) {
                 return Err(format!("Segment depth({}): {}", i + 1, error));
@@ -398,9 +441,12 @@ mod tests {
 
         //
 
-        let segment = "{{}";
+        let segment = "{test{actual_var}";
         let mut tokenizer = SegmentTokenizer::new(segment);
-        let expect = vec![Token::new_stat(0..3, segment)];
+        let expect = vec![
+            Token::new_stat(0..5, segment),
+            Token::new_var(5..segment.len(), segment),
+        ];
         cmp_token_arr(expect, tokenizer.tokenize(), get_line!())?;
 
         let segment = "test{test{actual_var}";
@@ -408,6 +454,22 @@ mod tests {
         let expect = vec![
             Token::new_stat(0..9, segment),
             Token::new_var(9..segment.len(), segment),
+        ];
+        cmp_token_arr(expect, tokenizer.tokenize(), get_line!())?;
+
+        //
+
+        let segment = "{{}";
+        let mut tokenizer = SegmentTokenizer::new(segment);
+        let expect = vec![Token::new_stat(0..3, segment)];
+        cmp_token_arr(expect, tokenizer.tokenize(), get_line!())?;
+
+        //
+
+        let segment = "{{}}";
+        let mut tokenizer = SegmentTokenizer::new(segment);
+        let expect = vec![
+            Token::new_stat(0..4, segment),
         ];
         cmp_token_arr(expect, tokenizer.tokenize(), get_line!())?;
 
