@@ -136,10 +136,14 @@ impl Router {
     }
 
     pub fn resolve(&self, request: &Request<Incoming>) -> Result<Option<&Route>, HttpError> {
-        // todo: handle constrained route parameter paths (potential wildcards)
+        self.resolve_inner(request.uri().path(), request.method())
+    }
+
+    /// This lets us test without requiring a Request<Incoming> instance
+    pub fn resolve_inner(&self, path: &str, method: &Method) -> Result<Option<&Route>, HttpError> {
         for route in &self.routes {
-            if route.matches(request.uri().path()) {
-                return if request.method() != route.get_method() {
+            if route.matches(path) {
+                return if method != route.get_method() {
                     Err(HttpError::new(405, "Method not allowed".to_string()))
                 } else {
                     Ok(Some(route))

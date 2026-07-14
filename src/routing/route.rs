@@ -1,5 +1,5 @@
 use crate::action::Action;
-use crate::routing::{split_segments};
+use crate::routing::split_segments;
 use crate::routing::tokenizer::{SegmentTokenizer, Token, TokenType};
 use hyper::Method;
 use regex::Regex;
@@ -9,6 +9,8 @@ use std::sync::LazyLock;
 
 static REG: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\{[^_][a-zA-Z0-9_]*[a-zA-Z0-9]}").unwrap());
+
+static DEFAULT_VAR_PATTERN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r".*").unwrap());
 
 static VAR_DELIMITER: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(\A\{)|(})\z").unwrap());
 
@@ -114,18 +116,48 @@ impl Route {
             if let Some(req_seg) = req_seg
                 && let Some(rou_seg) = rou_seg
             {
+                //
+                let mut matches = vec![];
+                let mut cursor: usize = 0;
                 dbg!(req_seg);
                 dbg!(&rou_seg.tokens);
 
+                // /post/{author}.{post_id}.{post_slug}
+                // /post/jake.123.how-to-do-thing
+
+                // next pattern is alphabetic chars
+                // ending
+                // found author pattern "jake" cursor index is now at 4
+
+                // next token_type is static Range(8..9).
+                // 4 - 8 = -4 range.start + -4 and range.end + -4 = Range(4..5)
+                // does &req_seg[4..5] == "."?
+                // yes
+
+                // next token_type is var, pattern is numbers
+                // cursor index is at 5, so find regex match in & &req_seg[5..]
+                //
+
+                // first token:
                 for token in &rou_seg.tokens {
-                    if token.token_type == TokenType::Static {
-                        if &req_seg.len() < &token.range.end {
-                            is_match = false;
-                            break;
+                    match token.token_type {
+                        TokenType::Static => {
+                            if &req_seg.len() < &token.range.end {
+                                is_match = false;
+                                break;
+                            }
+
+                            if &req_seg[token.range.clone()] != token.slice {
+                                is_match = false;
+                                break;
+                            }
                         }
-                        if &req_seg[token.range.clone()] != token.slice {
-                            is_match = false;
-                            break;
+                        TokenType::Variable => {
+                            if let Some(found) = DEFAULT_VAR_PATTERN.find(req_seg) {
+                                matches.push(found);
+                            } else {
+                                //
+                            }
                         }
                     }
                 }
@@ -191,4 +223,85 @@ fn process_segments(segments: Vec<&'static str>) -> Vec<RouteSegment> {
     }
 
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::action::{Action, Responsable};
+    use crate::app::App;
+    use crate::error::HttpError;
+    use crate::routing::router::Router;
+    use async_trait::async_trait;
+    use hyper::body::Incoming;
+    use hyper::{Method, Request};
+    use std::sync::LazyLock;
+
+    #[test]
+    fn test_landing() {
+        let resolved = ROUTER.resolve_inner("/", &Method::GET).unwrap().unwrap();
+        assert_eq!(resolved.path, "/")
+    }
+
+    #[derive(Debug)]
+    struct GenericPage(&'static str);
+
+    #[async_trait]
+    impl Action for GenericPage {
+        async fn handle(
+            &self,
+            _app: &App,
+            _request: Request<Incoming>,
+        ) -> Result<Box<dyn Responsable>, HttpError> {
+            Ok(Box::new(self.0.to_string()))
+        }
+    }
+
+    static ROUTER: LazyLock<Router> = LazyLock::new(|| Router::new(register_routes));
+
+    fn register_routes(router: &mut Router) {
+        router.get("/", GenericPage("landing page"), None);
+        router.get("/home", GenericPage("home page"), None);
+        router.get("/register", GenericPage("register page"), None);
+        router.post("/register", GenericPage("created account"), None);
+        router.get("/about-us", GenericPage("about page"), None);
+        router.get("/deeply/nested", GenericPage("deeply nested"), None);
+        router.get(
+            "/deeply/nested/route",
+            GenericPage("deeply nested route"),
+            None,
+        );
+        router.get(
+            "/deeply/othernested",
+            GenericPage("deeply other nested"),
+            None,
+        );
+        router.get(
+            "/deeply/othernested/route",
+            GenericPage("deeply other nested route"),
+            None,
+        );
+        router.get("/user", GenericPage("user index"), None);
+        router.get("/user/{user}", GenericPage("user show"), None);
+        router.get("/user/{user}/edit", GenericPage("user edit"), None);
+        router.get("/user/{user}/post", GenericPage("user post index"), None);
+        router.get(
+            "/user/{user}/post/{author}.{post_id}.{post_slug}",
+            GenericPage("blog article"),
+            None,
+        );
+        router.get("/static{var}", GenericPage("var test 1"), None);
+        router.get("/static{var}end", GenericPage("var test 2"), None);
+        router.get(
+            "/{varstart}-mid-static-{varend}",
+            GenericPage("var test 3"),
+            None,
+        );
+        router.get("/app/{wildcard}", GenericPage("app wildcard test"), None);
+        router.get("/{wildcard}", GenericPage("root wildcard test"), None);
+        router.get(
+            "/inaccessible-due-to-wildcard",
+            GenericPage("can't reach"),
+            None,
+        );
+    }
 }
