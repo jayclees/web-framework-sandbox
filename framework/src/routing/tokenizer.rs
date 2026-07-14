@@ -41,14 +41,14 @@ impl SegmentTokenizer {
                         // We were already in a curly brace
                         let prev = tokens.last_mut();
                         if let Some(token) = prev {
-                            match token.token_type {
+                            match token.constraint {
                                 // Append to the previous token
-                                TokenType::Static => {
+                                Constraint::Static => {
                                     token.range.end = i;
                                     token.slice = &self.segment[token.range.clone()];
                                 }
                                 // Previous token already closed, push new static token instead
-                                TokenType::Variable => {
+                                _ => {
                                     tokens.push(Token::new_var(self.state_start..i, &self.segment));
                                 }
                             }
@@ -76,14 +76,14 @@ impl SegmentTokenizer {
                         // if no prev token, create new token
                         let prev = tokens.last_mut();
                         if let Some(token) = prev {
-                            match token.token_type {
+                            match token.constraint {
                                 // Append to the previous token
-                                TokenType::Static => {
+                                Constraint::Static => {
                                     token.range.end = i + 1;
                                     token.slice = &self.segment[token.range.clone()];
                                 }
                                 // Previous token already closed, push new static token instead
-                                TokenType::Variable => {
+                                _ => {
                                     tokens.push(Token::new_var(
                                         self.state_start..i + 1,
                                         &self.segment,
@@ -108,7 +108,7 @@ impl SegmentTokenizer {
                                 // push last two chars "{}" onto previous token.
                                 self.state = State::Default;
                                 if let Some(token) = tokens.last_mut()
-                                    && token.token_type == TokenType::Static
+                                    && token.constraint.is_static()
                                 {
                                     // overwrite last token to include the last 2 chars "{}"
                                     token.range.end = i + 1;
@@ -153,7 +153,6 @@ enum State {
 
 #[derive(Debug, Clone)]
 pub struct Token {
-    pub token_type: TokenType,
     pub range: Range<usize>,
     pub slice: &'static str,
     pub constraint: Constraint,
@@ -163,17 +162,15 @@ impl Token {
     fn new_stat(range: Range<usize>, segment: &'static str) -> Token {
         let clone = range.clone();
         Token {
-            token_type: TokenType::Static,
             range: clone,
             slice: &segment[range],
-            constraint: Constraint::Default,
+            constraint: Constraint::Static,
         }
     }
 
     fn new_var(range: Range<usize>, segment: &'static str) -> Token {
         let clone = range.clone();
         Token {
-            token_type: TokenType::Variable,
             range: clone,
             slice: &segment[range],
             constraint: Constraint::Default,
@@ -193,29 +190,55 @@ impl Token {
     }
 }
 
-// impl Clone for Token {
-//     fn clone(&self) -> Token {
-//         Token {
-//             token_type: self.token_type.clone(),
-//             range: self.range.clone(),
-//             slice: self.slice.clone(),
-//             constraint: Constraint::Default.clone(),
-//         }
-//     }
-// }
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum TokenType {
-    Static,
-    Variable,
-}
-
 #[derive(Debug, Clone)]
 pub enum Constraint {
     Static,
-    Default,
+    Default, // default regex: .*
     Wildcard,
     Regex(Regex),
+}
+
+impl Constraint {
+    pub fn is_static(&self) -> bool {
+        match self {
+            Constraint::Static => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_default(&self) -> bool {
+        match self {
+            Constraint::Default => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_wildcard(&self) -> bool {
+        match self {
+            Constraint::Wildcard => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_regex(&self, pattern: &str) -> bool {
+        match self {
+            Constraint::Regex(regex) => regex.as_str() == pattern,
+            _ => false,
+        }
+    }
+}
+
+impl PartialEq for Constraint {
+    fn eq(&self, other: &Self) -> bool {
+        match other {
+            Constraint::Static => self.is_static(),
+            Constraint::Default => self.is_default(),
+            Constraint::Wildcard => self.is_wildcard(),
+            Constraint::Regex(regex) => {
+                self.is_regex(regex.as_str())
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -436,7 +459,7 @@ mod tests {
     }
 
     fn cmp_tokens(a: Token, b: Token, calling_line: String) -> Result<(), String> {
-        if a.token_type != b.token_type {
+        if a.constraint != b.constraint {
             println!("Left:  {a}\nRight: {b}");
             return Err(String::from(format!(
                 "Token types do not match. {calling_line}"
@@ -500,21 +523,11 @@ mod tests {
         fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
             write!(
                 f,
-                "Token {{ token_type: {}, range: {}, slice: \"{}\", constraint: {} }}",
-                self.token_type,
+                "Token {{ range: {}, slice: \"{}\", constraint: {} }}",
                 format!("Range {{ {}..{} }}", self.range.start, self.range.end),
                 self.slice,
                 self.constraint,
             )
-        }
-    }
-
-    impl Display for TokenType {
-        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-            match self {
-                TokenType::Static => write!(f, "{}", "TokenType::Static"),
-                TokenType::Variable => write!(f, "{}", "TokenType::Variable"),
-            }
         }
     }
 
@@ -526,7 +539,7 @@ mod tests {
                 Constraint::Wildcard => write!(f, "{}", "Constraint::Wildcard"),
                 Constraint::Regex(re) => {
                     write!(f, "{}", format!("Constraint::Regex(\"{}\")", re.as_str()))
-                },
+                }
             }
         }
     }
