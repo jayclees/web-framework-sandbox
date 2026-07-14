@@ -1,15 +1,15 @@
+pub mod action;
 pub mod route;
 pub mod router;
 mod tokenizer;
-pub mod action;
 
 /// Since we want to split the route definition path and the request
 /// instance path the same way we will extract it into a helper fn
-fn split_segments(path: &str) -> Vec<&str> {
+fn split_segments(path: String) -> Vec<String> {
     // Special case for single slash
     if path == "/" {
-        return vec![""];
+        return vec!["".to_string()];
     }
 
-    path.split("/").collect()
+    path.split("/").map(|segment| segment.to_string()).collect()
 }

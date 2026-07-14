@@ -9,40 +9,40 @@ static DEFAULT_VAR_PATTERN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(.*)
 
 #[derive(Debug)]
 pub struct Route {
-    name: Option<&'static str>,
+    name: Option<String>,
     method: Method,
-    path: &'static str,
+    path: String,
     segments: Vec<RouteSegment>,
     action: Box<dyn Action + 'static>,
 }
 
 impl Route {
-    pub fn new<A: Action + 'static>(method: Method, path: &'static str, action: A) -> Route {
+    pub fn new<A: Action + 'static>(method: Method, path: String, action: A) -> Route {
         // todo validate or normalize leading slash?
         Route {
             name: None,
             method,
-            path,
+            path: path.clone(),
             segments: process_segments(split_segments(path)),
             action: Box::new(action),
         }
     }
 
-    pub fn path(&self) -> &'static str {
-        self.path
+    pub fn path(&self) -> &String {
+        &self.path
     }
 
     pub fn action(&self) -> &Box<dyn Action + 'static> {
         &self.action
     }
 
-    pub fn name(mut self, name: &'static str) -> Route {
+    pub fn name(mut self, name: String) -> Route {
         self.name = Some(name);
         self
     }
 
-    pub fn get_name(&self) -> Option<&'static str> {
-        self.name
+    pub fn get_name(&self) -> &Option<String> {
+        &self.name
     }
 
     pub fn get_method(&self) -> &Method {
@@ -76,12 +76,12 @@ impl Route {
     }
 
     pub fn matches(&self, path: &str) -> bool {
-        let req_segs = split_segments(path);
+        let req_segs = split_segments(path.to_owned());
         let rou_segs = &self.segments;
 
         return cmp(req_segs, rou_segs, 0);
 
-        fn cmp(req_segs: Vec<&str>, rou_segs: &Vec<RouteSegment>, depth: usize) -> bool {
+        fn cmp(req_segs: Vec<String>, rou_segs: &Vec<RouteSegment>, depth: usize) -> bool {
             let req_seg = req_segs.iter().nth(depth);
             let rou_seg = rou_segs.iter().nth(depth);
 
@@ -191,27 +191,31 @@ impl Route {
 
 #[derive(Debug)]
 struct RouteSegment {
-    _segment: &'static str,
+    _segment: String,
     tokens: Vec<Token>,
 }
 
 impl RouteSegment {
-    pub fn new(segment: &'static str) -> RouteSegment {
+    pub fn new(seg: String) -> RouteSegment {
         RouteSegment {
-            _segment: segment,
-            tokens: SegmentTokenizer::new(segment).tokenize(),
+            _segment: seg.clone(),
+            tokens: SegmentTokenizer::new(seg).tokenize(),
         }
     }
 }
 
-fn process_segments(segments: Vec<&'static str>) -> Vec<RouteSegment> {
-    let mut result = Vec::new();
-
-    for segment in segments.into_iter() {
-        result.push(RouteSegment::new(segment));
-    }
-
-    result
+fn process_segments(segments: Vec<String>) -> Vec<RouteSegment> {
+    segments
+        .into_iter()
+        .map(|seg| RouteSegment::new(seg))
+        .collect()
+    // let mut result = Vec::new();
+    //
+    // for segment in segments.into_iter() {
+    //     result.push(RouteSegment::new(segment));
+    // }
+    //
+    // result
 }
 
 #[cfg(test)]
@@ -230,44 +234,44 @@ mod tests {
     fn register_routes(router: &mut Router) {
         // Some of these routes are here to check that they are NOT
         // hit, so please don't remove any routes.
-        router.get("/", GenericAction("Landing page"));
+        router.get("/".to_string(), GenericAction("Landing page"));
 
-        router.get("/home", GenericAction("Home page"));
-        router.get("/about", GenericAction("About us page"));
+        router.get("/home".to_string(), GenericAction("Home page"));
+        router.get("/about".to_string(), GenericAction("About us page"));
 
-        router.get("/home/trending", GenericAction("Trending page"));
-        router.get("/home/popular", GenericAction("Popular page"));
+        router.get("/home/trending".to_string(), GenericAction("Trending page"));
+        router.get("/home/popular".to_string(), GenericAction("Popular page"));
 
         router.get(
-            "/home/settings/profile",
+            "/home/settings/profile".to_string(),
             GenericAction("Profile settings page"),
         );
         router.get(
-            "/home/settings/preferences",
+            "/home/settings/preferences".to_string(),
             GenericAction("Preferences settings page"),
         );
 
         // Variable testing
-        router.get("/user/index", GenericAction("Show user index page"));
-        router.get("/user/{user}", GenericAction("Show user page"));
+        router.get("/user/index".to_string(), GenericAction("Show user index page"));
+        router.get("/user/{user}".to_string(), GenericAction("Show user page"));
         router.get(
-            "/user/{user}/details",
+            "/user/{user}/details".to_string(),
             GenericAction("Show user details page"),
         );
-        router.get("/user/{user}/edit", GenericAction("Show user edit page"));
+        router.get("/user/{user}/edit".to_string(), GenericAction("Show user edit page"));
         router.get(
-            "/user/{user}/posts/featured",
+            "/user/{user}/posts/featured".to_string(),
             GenericAction("Show user posts page"),
         );
 
         // For constraint testing
         router.getm(
-            "/author/{name}",
+            "/author/{name}".to_string(),
             GenericAction("Get author by name (alpha chars)"),
             |route| route.constrain("name", "[a-zA-Z]+"),
         );
         router.getm(
-            "/author/{id}",
+            "/author/{id}".to_string(),
             GenericAction("Get author by id (numeric chars)"),
             |route| route.constrain("id", "[0-9]+"),
         );

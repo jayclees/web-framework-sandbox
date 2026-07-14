@@ -5,8 +5,8 @@ use crate::action::pages::{
 };
 
 pub fn register_routes(router: &mut Router) -> () {
-    router.getm("/", ShowLanding, |route| route.name("landing"));
-    router.get("/about", ShowAbout);
+    router.getm("/".to_owned(), ShowLanding, |route| route.name("landing".to_owned()));
+    router.get("/about".to_owned(), ShowAbout);
     // router.get("/deeply/nested/route", ShowDeeplyNestedRoute);
     // router.get("/json-array", ShowNumberArray);
     // router.get("/json", ShowJson);
