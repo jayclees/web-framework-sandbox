@@ -210,18 +210,47 @@ mod tests {
     static ROUTER: LazyLock<Router> = LazyLock::new(|| Router::new(register_routes));
 
     fn register_routes(router: &mut Router) {
-        router.get("/", GenericPage("/"), None);
+        // Some of these routes are here to check that they are NOT
+        // hit, so please don't remove any routes.
+        router.get("/", GenericPage("Landing page"), None);
 
-        router.get("/home", GenericPage("/home"), None);
-        router.get("/about", GenericPage("/home"), None);
+        router.get("/home", GenericPage("Home page"), None);
+        router.get("/about", GenericPage("About us page"), None);
 
-        // router.get("/home/app", GenericPage("/home/app"), None);
-        // router.get("/home/posts", GenericPage("/home/posts"), None);
-        // router.get("/home/trending", GenericPage("/home/trending"), None);
-        // router.get("/home/settings", GenericPage("/home/settings"), None);
-        // router.get("/home/settings/profile", GenericPage("/home/settings/profile"), None);
-        // router.get("/home/settings/preferences", GenericPage("/home/settings/preferences"), None);
-        // router.get("/home/settings/security", GenericPage("/home/settings/security"), None);
+        router.get("/home/trending", GenericPage("Trending page"), None);
+        router.get("/home/popular", GenericPage("Popular page"), None);
+
+        router.get(
+            "/home/settings/profile",
+            GenericPage("Profile settings page"),
+            None,
+        );
+        router.get(
+            "/home/settings/preferences",
+            GenericPage("Preferences settings page"),
+            None,
+        );
+
+        // Variable testing
+        router.get("/user/index", GenericPage("Show user index page"), None);
+        router.get("/user/{user}", GenericPage("Show user page"), None);
+        router.get(
+            "/user/{user}/details",
+            GenericPage("Show user details page"),
+            None,
+        );
+        router.get(
+            "/user/{user}/edit",
+            GenericPage("Show user edit page"),
+            None,
+        );
+        router.get(
+            "/user/{user}/posts/featured",
+            GenericPage("Show user posts page"),
+            None,
+        );
+
+        // For constraint testing
     }
 
     #[test]
@@ -244,53 +273,108 @@ mod tests {
         assert_eq!("/about", resolved.unwrap().path);
     }
 
-    // #[test]
-    // fn test_deeply_nested_route() {
-    //     let resolved = ROUTER
-    //         .resolve_inner("/deeply/nested/route", &Method::GET)
-    //         .unwrap()
-    //         .unwrap();
-    //     assert_eq!("/deeply/nested/route", resolved.path)
-    // }
-    //
-    // #[test]
-    // fn test_deeply_othernested_route() {
-    //     let resolved = ROUTER
-    //         .resolve_inner("/deeply/othernested/route", &Method::GET)
-    //         .unwrap()
-    //         .unwrap();
-    //     assert_eq!("/deeply/othernested/route", resolved.path)
-    // }
-    //
-    // #[test]
-    // fn test_user_variable() {
-    //     let resolved = ROUTER
-    //         .resolve_inner("/user/1", &Method::GET)
-    //         .unwrap()
-    //         .unwrap();
-    //     assert_eq!("/user/{user}", resolved.path)
-    // }
-    //
-    // #[test]
-    // fn test_multiple_token_segments() {
-    //     let resolved = ROUTER
-    //         .resolve_inner("/user/123/post/johndoe.456.how-to-do-thing", &Method::GET)
-    //         .unwrap()
-    //         .unwrap();
-    //     assert_eq!(
-    //         "/user/{user}/post/{author}.{post_id}.{post_slug}",
-    //         resolved.path
-    //     )
-    // }
-    //
-    // #[test]
-    // fn test_app_wildcard() {
-    //     let resolved = ROUTER
-    //         .resolve_inner("/app/abc/123/foobar/hello-world", &Method::GET)
-    //         .unwrap()
-    //         .unwrap();
-    //     assert_eq!("/app/{wildcard}", resolved.path)
-    // }
+    #[test]
+    fn resolve_route_two_levels_a() {
+        let resolved = ROUTER
+            .resolve_inner("/home/trending", &Method::GET)
+            .unwrap();
+
+        if let None = resolved {
+            assert!(false, "Route not resolved.");
+        }
+
+        assert_eq!("/home/trending", resolved.unwrap().path);
+    }
+
+    #[test]
+    fn resolve_route_two_levels_b() {
+        let resolved = ROUTER.resolve_inner("/home/popular", &Method::GET).unwrap();
+
+        if let None = resolved {
+            assert!(false, "Route not resolved.");
+        }
+
+        assert_eq!("/home/popular", resolved.unwrap().path);
+    }
+
+    #[test]
+    fn resolve_route_three_levels_a() {
+        let resolved = ROUTER
+            .resolve_inner("/home/settings/profile", &Method::GET)
+            .unwrap();
+
+        if let None = resolved {
+            assert!(false, "Route not resolved.");
+        }
+
+        assert_eq!("/home/settings/profile", resolved.unwrap().path);
+    }
+
+    #[test]
+    fn resolve_route_three_levels_b() {
+        let resolved = ROUTER
+            .resolve_inner("/home/settings/preferences", &Method::GET)
+            .unwrap();
+
+        if let None = resolved {
+            assert!(false, "Route not resolved.");
+        }
+
+        assert_eq!("/home/settings/preferences", resolved.unwrap().path);
+    }
+
+    #[test]
+    fn resolve_static_route_before_variable_route() {
+        let resolved = ROUTER.resolve_inner("/user/index", &Method::GET).unwrap();
+        if let None = resolved {
+            assert!(false, "Route not resolved.");
+        }
+        assert_ne!("/user/{user}", resolved.unwrap().path);
+        assert_eq!("/user/index", resolved.unwrap().path);
+    }
+
+    #[test]
+    fn resolve_variable_route() {
+        let resolved = ROUTER.resolve_inner("/user/123", &Method::GET).unwrap();
+        if let None = resolved {
+            assert!(false, "Route not resolved.");
+        }
+        assert_ne!("/user/index", resolved.unwrap().path);
+        assert_eq!("/user/{user}", resolved.unwrap().path);
+    }
+
+    #[test]
+    fn resolve_variable_route_depth_plus_one_a() {
+        let resolved = ROUTER
+            .resolve_inner("/user/123/details", &Method::GET)
+            .unwrap();
+        if let None = resolved {
+            assert!(false, "Route not resolved.");
+        }
+        assert_eq!("/user/{user}/details", resolved.unwrap().path)
+    }
+
+    #[test]
+    fn resolve_variable_route_depth_plus_one_b() {
+        let resolved = ROUTER
+            .resolve_inner("/user/123/edit", &Method::GET)
+            .unwrap();
+        if let None = resolved {
+            assert!(false, "Route not resolved.");
+        }
+        assert_eq!("/user/{user}/edit", resolved.unwrap().path)
+    }
+
+    #[test]
+    fn resolve_variable_route_depth_plus_two() {
+        let resolved = ROUTER
+            .resolve_inner("/user/123/posts/featured", &Method::GET)
+            .unwrap();
+        if let None = resolved {
+            assert!(false, "Route not resolved.");
+        }
+        assert_eq!("/user/{user}/posts/featured", resolved.unwrap().path)
+    }
 
     #[derive(Debug)]
     struct GenericPage(&'static str);
