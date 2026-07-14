@@ -40,9 +40,19 @@ impl Router {
         &mut self,
         path: &'static str,
         action: A,
-        modifier: Option<fn(Route) -> Route>,
     ) -> &mut Router {
-        self.add(Method::GET, path, action, modifier);
+        self.add(Method::GET, path, action, None);
+
+        self
+    }
+
+    pub fn getm<A: Action + 'static>(
+        &mut self,
+        path: &'static str,
+        action: A,
+        modifier: fn(Route) -> Route,
+    ) -> &mut Router {
+        self.add(Method::GET, path, action, Some(modifier));
 
         self
     }

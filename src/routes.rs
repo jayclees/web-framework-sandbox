@@ -5,18 +5,18 @@ use crate::action::pages::{
 };
 
 pub fn register_routes(router: &mut Router) -> () {
-    router.get("/", ShowLanding, Some(|route| route.name("landing")));
-    router.get("/about", ShowAbout, None);
-    // router.get("/deeply/nested/route", ShowDeeplyNestedRoute, None);
-    // router.get("/json-array", ShowNumberArray, None);
-    // router.get("/json", ShowJson, None);
-    // router.get("/html", ShowHtml, None);
-    // router.get("/user/{user}", ShowUser, None);
-    // // router.get("/user/{user}/post/{post}", ShowUser, None);
-    // router.get("/error", ShowErrorPage, None);
-    // router.get(
+    router.getm("/", ShowLanding, |route| route.name("landing"));
+    router.get("/about", ShowAbout);
+    // router.get("/deeply/nested/route", ShowDeeplyNestedRoute);
+    // router.get("/json-array", ShowNumberArray);
+    // router.get("/json", ShowJson);
+    // router.get("/html", ShowHtml);
+    // router.get("/user/{user}", ShowUser);
+    // // router.get("/user/{user}/post/{post}", ShowUser);
+    // router.get("/error", ShowErrorPage);
+    // router.getm(
     //     "/home/app-{wildcard}",
     //     ServeApp,
-    //     Some(|route| route.constrain("wildcard", "asdf")),
+    //     |route| route.constrain("wildcard", "asdf"),
     // );
 }

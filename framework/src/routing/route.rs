@@ -2,7 +2,7 @@ use crate::routing::action::Action;
 use crate::routing::split_segments;
 use crate::routing::tokenizer::{Constraint, SegmentTokenizer, Token};
 use hyper::Method;
-use regex::Regex;
+use regex::{Match, Regex};
 use std::sync::LazyLock;
 
 static DEFAULT_VAR_PATTERN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(.*){1,}").unwrap());
@@ -67,10 +67,6 @@ impl Route {
         for segment in &mut self.segments {
             for token in &mut segment.tokens {
                 if token.slice == handle {
-                    if token.constraint == Constraint::Static {
-                        panic!("Cannot set static token as wildcard.")
-                    }
-
                     token.wildcard(enable);
                     return self;
                 };
@@ -89,11 +85,11 @@ impl Route {
             let req_seg = req_segs.iter().nth(depth);
             let rou_seg = rou_segs.iter().nth(depth);
 
+            // Recursive checks reached all the way to the end without failing, and both
+            // ended at the same depth. This means we've found a match. Return true.
             if let None = req_seg
                 && let None = rou_seg
             {
-                // Recursive checks reached all the way to the end without failing, and both
-                // ended at the same depth. This means we've found a match. Return true.
                 return true;
             }
 
@@ -133,28 +129,13 @@ impl Route {
                             false
                         }
                     }
-                    Constraint::Default => {
-                        let found = DEFAULT_VAR_PATTERN.find_at(req_seg, cursor);
-                        if let None = found {
-                            false
-                        } else {
-                            cursor = found.unwrap().range().end;
-                            true
-                        }
-                    }
-                    Constraint::Regex(regex) => {
-                        let found = regex.find_at(req_seg, cursor);
-                        if let None = found {
-                            false
-                        } else {
-                            cursor = found.unwrap().range().end;
-                            true
-                        }
-                    }
+                    Constraint::Default => reconcile_regex(None, req_seg, &mut cursor),
+                    Constraint::Regex(regex) => reconcile_regex(Some(regex), req_seg, &mut cursor),
                     Constraint::Wildcard => {
-                        // if cursor is at start range for token.range
+                        // If cursor matches start range for token.range
                         if cursor == token.range.start {
-                            // wildcard token starts at correct position in req_seg, return true for entire route
+                            // Wildcard token starts at correct position in
+                            // req_seg, return true for entire route
                             return true;
                         }
                         false
@@ -164,9 +145,46 @@ impl Route {
                 if !is_match {
                     return false;
                 }
+
+                // There is remaining unreconciled characters after all checks
+                // todo test this
+                // if cursor != req_seg.len() {
+                //     return false;
+                // }
             }
 
             true
+        }
+
+        fn reconcile_regex(regex: Option<Regex>, req_seg: &str, cursor: &mut usize) -> bool {
+            // First check that the string slice being tested only contains
+            // the characters allowed in the regex constraint.
+            let is_match: bool;
+            if let Some(regex) = &regex {
+                is_match = regex.is_match_at(req_seg, *cursor);
+                if req_seg == "123abc" {
+                    dbg!(is_match, regex.as_str(), req_seg);
+                }
+            } else {
+                is_match = DEFAULT_VAR_PATTERN.is_match_at(req_seg, *cursor);
+            }
+            if !is_match {
+                return false;
+            }
+
+            let found: Option<Match>;
+            if let Some(regex) = regex {
+                found = regex.find_at(req_seg, *cursor);
+            } else {
+                found = DEFAULT_VAR_PATTERN.find_at(req_seg, *cursor);
+            }
+
+            if let None = found {
+                false
+            } else {
+                *cursor = found.unwrap().range().end;
+                true
+            }
         }
     }
 }
@@ -212,45 +230,47 @@ mod tests {
     fn register_routes(router: &mut Router) {
         // Some of these routes are here to check that they are NOT
         // hit, so please don't remove any routes.
-        router.get("/", GenericPage("Landing page"), None);
+        router.get("/", GenericAction("Landing page"));
 
-        router.get("/home", GenericPage("Home page"), None);
-        router.get("/about", GenericPage("About us page"), None);
+        router.get("/home", GenericAction("Home page"));
+        router.get("/about", GenericAction("About us page"));
 
-        router.get("/home/trending", GenericPage("Trending page"), None);
-        router.get("/home/popular", GenericPage("Popular page"), None);
+        router.get("/home/trending", GenericAction("Trending page"));
+        router.get("/home/popular", GenericAction("Popular page"));
 
         router.get(
             "/home/settings/profile",
-            GenericPage("Profile settings page"),
-            None,
+            GenericAction("Profile settings page"),
         );
         router.get(
             "/home/settings/preferences",
-            GenericPage("Preferences settings page"),
-            None,
+            GenericAction("Preferences settings page"),
         );
 
         // Variable testing
-        router.get("/user/index", GenericPage("Show user index page"), None);
-        router.get("/user/{user}", GenericPage("Show user page"), None);
+        router.get("/user/index", GenericAction("Show user index page"));
+        router.get("/user/{user}", GenericAction("Show user page"));
         router.get(
             "/user/{user}/details",
-            GenericPage("Show user details page"),
-            None,
+            GenericAction("Show user details page"),
         );
-        router.get(
-            "/user/{user}/edit",
-            GenericPage("Show user edit page"),
-            None,
-        );
+        router.get("/user/{user}/edit", GenericAction("Show user edit page"));
         router.get(
             "/user/{user}/posts/featured",
-            GenericPage("Show user posts page"),
-            None,
+            GenericAction("Show user posts page"),
         );
 
         // For constraint testing
+        router.getm(
+            "/author/{name}",
+            GenericAction("Get author by name (alpha chars)"),
+            |route| route.constrain("name", "[a-zA-Z]+"),
+        );
+        router.getm(
+            "/author/{id}",
+            GenericAction("Get author by id (numeric chars)"),
+            |route| route.constrain("id", "[0-9]+"),
+        );
     }
 
     #[test]
@@ -259,7 +279,7 @@ mod tests {
         if let None = resolved {
             assert!(false, "Route not resolved.");
         }
-        assert_eq!("/", resolved.unwrap().path)
+        assert_eq!("/", resolved.unwrap().path);
     }
 
     #[test]
@@ -351,7 +371,7 @@ mod tests {
         if let None = resolved {
             assert!(false, "Route not resolved.");
         }
-        assert_eq!("/user/{user}/details", resolved.unwrap().path)
+        assert_eq!("/user/{user}/details", resolved.unwrap().path);
     }
 
     #[test]
@@ -362,7 +382,7 @@ mod tests {
         if let None = resolved {
             assert!(false, "Route not resolved.");
         }
-        assert_eq!("/user/{user}/edit", resolved.unwrap().path)
+        assert_eq!("/user/{user}/edit", resolved.unwrap().path);
     }
 
     #[test]
@@ -373,14 +393,70 @@ mod tests {
         if let None = resolved {
             assert!(false, "Route not resolved.");
         }
-        assert_eq!("/user/{user}/posts/featured", resolved.unwrap().path)
+        assert_eq!("/user/{user}/posts/featured", resolved.unwrap().path);
+    }
+
+    #[test]
+    fn resolve_variable_constraints_a() {
+        let resolved = ROUTER
+            .resolve_inner("/author/johndoe", &Method::GET)
+            .unwrap();
+        if let None = resolved {
+            assert!(false, "Route not resolved.");
+        }
+        assert_ne!("/author/{id}", resolved.unwrap().path);
+        assert_eq!("/author/{name}", resolved.unwrap().path);
+    }
+
+    #[test]
+    fn resolve_variable_constraints_b() {
+        let resolved = ROUTER.resolve_inner("/author/123", &Method::GET).unwrap();
+        if let None = resolved {
+            assert!(false, "Route not resolved.");
+        }
+        assert_ne!("/author/{user}", resolved.unwrap().path);
+        assert_eq!("/author/{id}", resolved.unwrap().path);
+    }
+
+    #[test]
+    fn resolve_variable_constraints_c() {
+        // Test mixed alpha/num. Since we have two routes that each test
+        // exclusively for alphabetical chars or numeric chars, a
+        // mixed route parameter should resolve to neither.
+        let resolved = ROUTER
+            .resolve_inner("/author/abc123", &Method::GET)
+            .unwrap();
+        if let Some(route) = resolved {
+            assert!(
+                false,
+                "A route was resolved when none should have., \"{}\"",
+                route.path
+            );
+        }
+    }
+
+    #[test]
+    fn resolve_variable_constraints_d() {
+        // Test mixed alpha/num. Since we have two routes that each test
+        // exclusively for alphabetical chars or numeric chars, a
+        // mixed route parameter should resolve to neither.
+        let resolved = ROUTER
+            .resolve_inner("/author/123abc", &Method::GET)
+            .unwrap();
+        if let Some(route) = resolved {
+            assert!(
+                false,
+                "A route was resolved when none should have., \"{}\"",
+                route.path
+            );
+        }
     }
 
     #[derive(Debug)]
-    struct GenericPage(&'static str);
+    struct GenericAction(&'static str);
 
     #[async_trait]
-    impl Action for GenericPage {
+    impl Action for GenericAction {
         async fn handle(
             &self,
             _app: &App,
