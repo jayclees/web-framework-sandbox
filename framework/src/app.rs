@@ -1,13 +1,9 @@
-use crate::error::HttpError;
-use crate::routing::router::Router;
 use futures::FutureExt;
 use http_body_util::Full;
 use hyper::body::{Bytes, Incoming};
 use hyper::rt::Executor;
 use hyper::service::service_fn;
 use hyper::{Request, Response};
-use hyper_util::rt::TokioIo;
-use hyper_util::server::conn::auto;
 use minijinja::Environment;
 use sea_orm::DatabaseConnection;
 use serde_json::json;
@@ -16,7 +12,11 @@ use std::fmt::Debug;
 use std::net::SocketAddr;
 use std::panic::AssertUnwindSafe;
 use std::sync::Arc;
+use hyper_util::rt::TokioIo;
+use hyper_util::server::conn::auto;
 use tokio::net::TcpListener;
+use crate::error::HttpError;
+use crate::routing::router::Router;
 
 #[derive(Debug)]
 pub struct Env {

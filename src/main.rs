@@ -1,16 +1,12 @@
 mod action;
-mod app;
 mod entity;
-mod error;
-mod helper;
 mod routes;
-mod routing;
 
-use crate::app::App;
-use crate::error::register_panic_hook;
 use crate::routes::register_routes;
+use framework::app::App;
+use framework::error::register_panic_hook;
+use framework::routing::router::Router;
 use minijinja::{path_loader, Environment};
-use routing::router::Router;
 use sea_orm::{ConnectOptions, Database};
 use std::env;
 use std::error::Error;
@@ -51,5 +47,5 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     let app = App::new(router, addr, env, db).await;
     let app = Arc::new(app);
 
-    app::run(app).await
+    framework::app::run(app).await
 }

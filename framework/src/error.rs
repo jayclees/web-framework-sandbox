@@ -47,11 +47,11 @@ pub fn register_panic_hook() {
         LAST_BACKTRACE.with(|backtrace| {
             *backtrace.borrow_mut() = Some(Backtrace::force_capture());
 
-            let mut paths = fs::read_dir("storage/logs")
+            // todo use parent project root relative route
+            let mut paths = fs::read_dir("../../storage/logs")
                 .unwrap_or_else(|_| {
-                    // todo test recursive creating dir
-                    fs::create_dir("storage/logs").expect("failed to create dir");
-                    fs::read_dir("storage/logs").unwrap()
+                    fs::create_dir("../../storage/logs").expect("failed to create dir");
+                    fs::read_dir("../../storage/logs").unwrap()
                 })
                 .map(|p| String::from(p.unwrap().file_name().to_str().unwrap()))
                 .filter(|n| pattern.is_match(n))

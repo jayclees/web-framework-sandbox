@@ -1,11 +1,11 @@
-use crate::action::Action;
-use crate::routing::split_segments;
-use crate::routing::tokenizer::{SegmentTokenizer, Token, TokenType};
 use hyper::Method;
 use regex::Regex;
 use std::borrow::Cow;
 use std::ops::Range;
 use std::sync::LazyLock;
+use crate::routing::action::Action;
+use crate::routing::split_segments;
+use crate::routing::tokenizer::{SegmentTokenizer, Token, TokenType};
 
 static REG: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\{[^_][a-zA-Z0-9_]*[a-zA-Z0-9]}").unwrap());
@@ -227,14 +227,14 @@ fn process_segments(segments: Vec<&'static str>) -> Vec<RouteSegment> {
 
 #[cfg(test)]
 mod tests {
-    use crate::action::{Action, Responsable};
-    use crate::app::App;
-    use crate::error::HttpError;
-    use crate::routing::router::Router;
     use async_trait::async_trait;
     use hyper::body::Incoming;
     use hyper::{Method, Request};
     use std::sync::LazyLock;
+    use crate::app::App;
+    use crate::error::HttpError;
+    use crate::routing::action::{Action, Responsable};
+    use crate::routing::router::Router;
 
     #[test]
     fn test_landing() {

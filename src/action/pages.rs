@@ -1,13 +1,13 @@
-use crate::action::{Action, Responsable};
-use crate::app::App;
 use crate::entity::user::Entity as User;
-use crate::error::HttpError;
 use async_trait::async_trait;
 use hyper::body::Incoming;
 use hyper::Request;
 use sea_orm::EntityTrait;
 use serde::Serialize;
 use serde_json::json;
+use framework::app::App;
+use framework::error::HttpError;
+use framework::routing::action::{Action, Responsable};
 
 #[derive(Debug)]
 pub struct ShowLanding;

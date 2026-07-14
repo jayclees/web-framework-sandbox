@@ -9,7 +9,7 @@ pub struct SegmentTokenizer {
 }
 
 impl SegmentTokenizer {
-    pub(crate) fn new(segment: &'static str) -> SegmentTokenizer {
+    pub fn new(segment: &'static str) -> SegmentTokenizer {
         SegmentTokenizer {
             state: State::Default,
             segment,
@@ -17,7 +17,7 @@ impl SegmentTokenizer {
         }
     }
 
-    pub(crate) fn tokenize(&mut self) -> Vec<Token> {
+    pub fn tokenize(&mut self) -> Vec<Token> {
         // see tokenizer::split_segments
         if self.segment == "" {
             return vec![Token::new_stat(0..0, "")];
@@ -153,9 +153,9 @@ enum State {
 
 #[derive(Debug)]
 pub struct Token {
-    pub(crate) token_type: TokenType,
-    pub(crate) range: Range<usize>,
-    pub(crate) slice: &'static str,
+    pub token_type: TokenType,
+    pub range: Range<usize>,
+    pub slice: &'static str,
     constraint: Constraint,
     // Static(Range<usize>, &'static str),
     // Variable(Range<usize>, &'static str),
