@@ -242,6 +242,12 @@ mod tests {
         assert_eq!(resolved.path, "/")
     }
 
+    #[test]
+    fn test_about() {
+        let resolved = ROUTER.resolve_inner("/about-us", &Method::GET).unwrap().unwrap();
+        assert_eq!(resolved.path, "/about-us")
+    }
+
     #[derive(Debug)]
     struct GenericPage(&'static str);
 
