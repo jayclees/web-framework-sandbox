@@ -1,18 +1,11 @@
-use hyper::Method;
-use regex::Regex;
-use std::borrow::Cow;
-use std::ops::Range;
-use std::sync::LazyLock;
 use crate::routing::action::Action;
 use crate::routing::split_segments;
-use crate::routing::tokenizer::{SegmentTokenizer, Token, TokenType};
+use crate::routing::tokenizer::{Constraint, SegmentTokenizer, Token, TokenType};
+use hyper::Method;
+use regex::Regex;
+use std::sync::LazyLock;
 
-static REG: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"\{[^_][a-zA-Z0-9_]*[a-zA-Z0-9]}").unwrap());
-
-static DEFAULT_VAR_PATTERN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r".*").unwrap());
-
-static VAR_DELIMITER: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(\A\{)|(})\z").unwrap());
+static DEFAULT_VAR_PATTERN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(.*){1,}").unwrap());
 
 #[derive(Debug)]
 pub struct Route {
@@ -57,46 +50,57 @@ impl Route {
     }
 
     pub fn constrain(mut self, parameter: &'static str, pattern: &'static str) -> Route {
+        let handle = format!("{{{parameter}}}");
         for segment in &mut self.segments {
             for token in &mut segment.tokens {
-                if token.token_type == TokenType::Variable {
-                    // token.constrain(pattern);
-                    break;
+                if token.token_type == TokenType::Variable && token.slice == handle {
+                    token.constrain(pattern);
+                    return self;
                 }
             }
         }
-        self
+        panic!("Parameter not found");
     }
 
     pub fn wildcard(mut self, parameter: &'static str, enable: bool) -> Route {
+        let handle = format!("{{{parameter}}}");
         for segment in &mut self.segments {
             for token in &mut segment.tokens {
-                if token.token_type == TokenType::Variable {
-                    // token.wildcard(enable);
-                    break;
+                if token.token_type == TokenType::Variable && token.slice == handle {
+                    token.wildcard(enable);
+                    return self;
                 };
             }
         }
-        self
+        panic!("Parameter not found");
     }
 
     pub fn matches(&self, path: &str) -> bool {
         let req_segs = split_segments(path);
         let rou_segs = &self.segments;
-        let mut is_match = true;
-        let mut step = 0;
 
-        // Loop over both request segments and route segments
-        // and process each segment. todo check for wildcard variables
-        loop {
-            let req_seg = req_segs.iter().nth(step);
-            let rou_seg = rou_segs.iter().nth(step);
+        // request path: /home/settings/preferences
+        // Route list:
+        // /
+        // /home
+        // /home/app
+        // /home/posts
+        // /home/trending
+        // /home/settings
+        // /home/settings/profile
+        // /home/settings/preferences
+        // /home/settings/security
 
-            // Both ran out at same time, break out of loop and return the current value of matches
+        return cmp(req_segs, rou_segs, 0);
+
+        fn cmp(req_segs: Vec<&str>, rou_segs: &Vec<RouteSegment>, depth: usize) -> bool {
+            let req_seg = req_segs.iter().nth(depth);
+            let rou_seg = rou_segs.iter().nth(depth);
+
             if let None = req_seg
                 && let None = rou_seg
             {
-                return is_match;
+                return false;
             }
 
             // One ran out before the other. Segment counts do not match. Return false.
@@ -113,107 +117,104 @@ impl Route {
                 return false;
             }
 
-            if let Some(req_seg) = req_seg
-                && let Some(rou_seg) = rou_seg
-            {
-                //
-                let mut matches = vec![];
-                let mut cursor: usize = 0;
-                dbg!(req_seg);
-                dbg!(&rou_seg.tokens);
+            if reconcile_segs(req_seg.unwrap(), rou_seg.unwrap().tokens.clone()) {
+                return cmp(req_segs, rou_segs, depth + 1);
+            }
 
-                // /post/{author}.{post_id}.{post_slug}
-                // /post/jake.123.how-to-do-thing
+            false
+        }
 
-                // next pattern is alphabetic chars
-                // ending
-                // found author pattern "jake" cursor index is now at 4
-
-                // next token_type is static Range(8..9).
-                // 4 - 8 = -4 range.start + -4 and range.end + -4 = Range(4..5)
-                // does &req_seg[4..5] == "."?
-                // yes
-
-                // next token_type is var, pattern is numbers
-                // cursor index is at 5, so find regex match in & &req_seg[5..]
-                //
-
-                // first token:
-                for token in &rou_seg.tokens {
-                    match token.token_type {
-                        TokenType::Static => {
-                            if &req_seg.len() < &token.range.end {
-                                is_match = false;
-                                break;
-                            }
-
-                            if &req_seg[token.range.clone()] != token.slice {
-                                is_match = false;
-                                break;
-                            }
+        fn reconcile_segs(req_seg: &str, tokens: Vec<Token>) -> bool {
+            let mut cursor = 0;
+            // if any of these checks fail, break out of loop and return false
+            for token in tokens {
+                let is_match = match token.constraint {
+                    Constraint::Static => {
+                        let slices_match = req_seg.len() >= token.range.end
+                            && &req_seg[token.range.clone()] == token.slice;
+                        if slices_match {
+                            cursor = token.range.end
                         }
-                        TokenType::Variable => {
-                            if let Some(found) = DEFAULT_VAR_PATTERN.find(req_seg) {
-                                matches.push(found);
-                            } else {
-                                //
-                            }
+                        true
+                    }
+                    Constraint::Default => {
+                        let found = DEFAULT_VAR_PATTERN.find_at(req_seg, cursor);
+                        if let None = found {
+                            false
+                        } else {
+                            cursor = found.unwrap().range().end;
+                            true
                         }
                     }
-                }
+                    Constraint::Regex(regex) => {
+                        let found = regex.find_at(req_seg, cursor);
+                        if let None = found {
+                            false
+                        } else {
+                            cursor = found.unwrap().range().end;
+                            true
+                        }
+                    }
+                    Constraint::Wildcard => {
+                        // if cursor is at start range for token.range
+                        if cursor == token.range.start {
+                            // wildcard token starts at correct position in req_seg, return true for entire route
+                            return true;
+                        }
+                        false
+                    }
+                };
 
                 if !is_match {
-                    break;
+                    return false;
                 }
             }
 
-            step += 1;
+            true
         }
-
-        is_match
     }
 }
 
 #[derive(Debug)]
 struct RouteSegment {
-    segment: &'static str,
+    _segment: &'static str,
     tokens: Vec<Token>,
 }
 
 impl RouteSegment {
     pub fn new(segment: &'static str) -> RouteSegment {
         RouteSegment {
-            segment,
+            _segment: segment,
             tokens: SegmentTokenizer::new(segment).tokenize(),
         }
     }
 }
 
-#[derive(Debug)]
-struct RouteVariable {
-    handle: Cow<'static, str>,
-    range: Range<usize>,
-    constraint: Constraint,
-}
+// #[derive(Debug)]
+// struct RouteVariable {
+//     handle: Cow<'static, str>,
+//     range: Range<usize>,
+//     // constraint: Constraint,
+// }
 
-impl RouteVariable {
-    fn wildcard(&mut self, enable: bool) -> &RouteVariable {
-        self.constraint = Constraint::Wildcard(enable);
-        self
-    }
+// impl RouteVariable {
+//     fn wildcard(&mut self, enable: bool) -> &RouteVariable {
+//         self.constraint = Constraint::Wildcard(enable);
+//         self
+//     }
+//
+//     fn constrain(&mut self, pattern: &'static str) -> &RouteVariable {
+//         self.constraint = Constraint::Regex(Regex::new(pattern).unwrap());
+//         self
+//     }
+// }
 
-    fn constrain(&mut self, pattern: &'static str) -> &RouteVariable {
-        self.constraint = Constraint::Regex(Regex::new(pattern).unwrap());
-        self
-    }
-}
-
-#[derive(Debug)]
-enum Constraint {
-    Default,
-    Wildcard(bool),
-    Regex(Regex),
-}
+// #[derive(Debug)]
+// enum Constraint {
+//     Default,
+//     Wildcard(bool),
+//     Regex(Regex),
+// }
 
 fn process_segments(segments: Vec<&'static str>) -> Vec<RouteSegment> {
     let mut result = Vec::new();
@@ -227,40 +228,14 @@ fn process_segments(segments: Vec<&'static str>) -> Vec<RouteSegment> {
 
 #[cfg(test)]
 mod tests {
-    use async_trait::async_trait;
-    use hyper::body::Incoming;
-    use hyper::{Method, Request};
-    use std::sync::LazyLock;
     use crate::app::App;
     use crate::error::HttpError;
     use crate::routing::action::{Action, Responsable};
     use crate::routing::router::Router;
-
-    #[test]
-    fn test_landing() {
-        let resolved = ROUTER.resolve_inner("/", &Method::GET).unwrap().unwrap();
-        assert_eq!(resolved.path, "/")
-    }
-
-    #[test]
-    fn test_about() {
-        let resolved = ROUTER.resolve_inner("/about-us", &Method::GET).unwrap().unwrap();
-        assert_eq!(resolved.path, "/about-us")
-    }
-
-    #[derive(Debug)]
-    struct GenericPage(&'static str);
-
-    #[async_trait]
-    impl Action for GenericPage {
-        async fn handle(
-            &self,
-            _app: &App,
-            _request: Request<Incoming>,
-        ) -> Result<Box<dyn Responsable>, HttpError> {
-            Ok(Box::new(self.0.to_string()))
-        }
-    }
+    use async_trait::async_trait;
+    use hyper::body::Incoming;
+    use hyper::{Method, Request};
+    use std::sync::LazyLock;
 
     static ROUTER: LazyLock<Router> = LazyLock::new(|| Router::new(register_routes));
 
@@ -293,7 +268,11 @@ mod tests {
         router.get(
             "/user/{user}/post/{author}.{post_id}.{post_slug}",
             GenericPage("blog article"),
-            None,
+            Some(|route| {
+                route
+                    .constrain("author", "[a-zA-Z]+")
+                    .constrain("post_id", "[0-9]+")
+            }),
         );
         router.get("/static{var}", GenericPage("var test 1"), None);
         router.get("/static{var}end", GenericPage("var test 2"), None);
@@ -303,11 +282,94 @@ mod tests {
             None,
         );
         router.get("/app/{wildcard}", GenericPage("app wildcard test"), None);
-        router.get("/{wildcard}", GenericPage("root wildcard test"), None);
+        router.get(
+            "/{wildcard}",
+            GenericPage("root wildcard test"),
+            Some(|route| route.wildcard("wildcard", true)),
+        );
         router.get(
             "/inaccessible-due-to-wildcard",
             GenericPage("can't reach"),
             None,
         );
+    }
+
+    #[test]
+    fn test_landing() {
+        let resolved = ROUTER.resolve_inner("/", &Method::GET).unwrap().unwrap();
+        assert_eq!("/", resolved.path)
+    }
+
+    #[test]
+    fn test_about() {
+        let resolved = ROUTER.resolve_inner("/about-us", &Method::GET).unwrap();
+
+        if let None = resolved {
+            assert!(false, "Route not resolved.");
+        }
+
+        assert_eq!("/about-us", resolved.unwrap().path);
+    }
+
+    #[test]
+    fn test_deeply_nested_route() {
+        let resolved = ROUTER
+            .resolve_inner("/deeply/nested/route", &Method::GET)
+            .unwrap()
+            .unwrap();
+        assert_eq!("/deeply/nested/route", resolved.path)
+    }
+
+    #[test]
+    fn test_deeply_othernested_route() {
+        let resolved = ROUTER
+            .resolve_inner("/deeply/othernested/route", &Method::GET)
+            .unwrap()
+            .unwrap();
+        assert_eq!("/deeply/othernested/route", resolved.path)
+    }
+
+    #[test]
+    fn test_user_variable() {
+        let resolved = ROUTER
+            .resolve_inner("/user/1", &Method::GET)
+            .unwrap()
+            .unwrap();
+        assert_eq!("/user/{user}", resolved.path)
+    }
+
+    #[test]
+    fn test_multiple_token_segments() {
+        let resolved = ROUTER
+            .resolve_inner("/user/123/post/johndoe.456.how-to-do-thing", &Method::GET)
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            "/user/{user}/post/{author}.{post_id}.{post_slug}",
+            resolved.path
+        )
+    }
+
+    #[test]
+    fn test_app_wildcard() {
+        let resolved = ROUTER
+            .resolve_inner("/app/abc/123/foobar/hello-world", &Method::GET)
+            .unwrap()
+            .unwrap();
+        assert_eq!("/app/{wildcard}", resolved.path)
+    }
+
+    #[derive(Debug)]
+    struct GenericPage(&'static str);
+
+    #[async_trait]
+    impl Action for GenericPage {
+        async fn handle(
+            &self,
+            _app: &App,
+            _request: Request<Incoming>,
+        ) -> Result<Box<dyn Responsable>, HttpError> {
+            Ok(Box::new(self.0.to_string()))
+        }
     }
 }

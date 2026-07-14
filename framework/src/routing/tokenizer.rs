@@ -1,5 +1,5 @@
-use std::ops::Range;
 use regex::Regex;
+use std::ops::Range;
 
 #[derive(Debug)]
 pub struct SegmentTokenizer {
@@ -107,7 +107,7 @@ impl SegmentTokenizer {
                                 // static. If previous token is Token::Static(..),
                                 // push last two chars "{}" onto previous token.
                                 self.state = State::Default;
-                                if let Some(mut token) = tokens.last_mut()
+                                if let Some(token) = tokens.last_mut()
                                     && token.token_type == TokenType::Static
                                 {
                                     // overwrite last token to include the last 2 chars "{}"
@@ -139,7 +139,7 @@ impl SegmentTokenizer {
         tokens
     }
 
-    pub fn change_state(&mut self, state: State, index: usize) {
+    fn change_state(&mut self, state: State, index: usize) {
         self.state = state;
         self.state_start = index;
     }
@@ -151,14 +151,12 @@ enum State {
     InCurly,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Token {
     pub token_type: TokenType,
     pub range: Range<usize>,
     pub slice: &'static str,
-    constraint: Constraint,
-    // Static(Range<usize>, &'static str),
-    // Variable(Range<usize>, &'static str),
+    pub constraint: Constraint,
 }
 
 impl Token {
@@ -181,16 +179,40 @@ impl Token {
             constraint: Constraint::Default,
         }
     }
+
+    pub fn constrain(&mut self, pattern: &'static str) {
+        self.constraint = Constraint::Regex(Regex::new(pattern).unwrap())
+    }
+
+    pub fn wildcard(&mut self, enable: bool) {
+        self.constraint = if enable {
+            Constraint::Wildcard
+        } else {
+            Constraint::Default
+        }
+    }
 }
 
-#[derive(Debug, PartialEq)]
+// impl Clone for Token {
+//     fn clone(&self) -> Token {
+//         Token {
+//             token_type: self.token_type.clone(),
+//             range: self.range.clone(),
+//             slice: self.slice.clone(),
+//             constraint: Constraint::Default.clone(),
+//         }
+//     }
+// }
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum TokenType {
     Static,
     Variable,
 }
 
-#[derive(Debug)]
-enum Constraint {
+#[derive(Debug, Clone)]
+pub enum Constraint {
+    Static,
     Default,
     Wildcard,
     Regex(Regex),
@@ -452,11 +474,11 @@ mod tests {
     fn cmp_token_arr(a: Vec<Token>, b: Vec<Token>, calling_line: String) -> Result<(), String> {
         if a.len() != b.len() {
             println!("Left  ======================>");
-            for (i, token_a) in a.iter().enumerate() {
+            for token_a in a.iter() {
                 println!("{token_a}");
             }
             println!("Right ======================>");
-            for (i, token_b) in b.iter().enumerate() {
+            for token_b in b.iter() {
                 println!("{token_b}");
             }
             println!("End   ======================>");
@@ -499,41 +521,12 @@ mod tests {
     impl Display for Constraint {
         fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
             match self {
+                Constraint::Static => write!(f, "{}", "Constraint::Static"),
                 Constraint::Default => write!(f, "{}", "Constraint::Default"),
                 Constraint::Wildcard => write!(f, "{}", "Constraint::Wildcard"),
                 Constraint::Regex(re) => {
                     write!(f, "{}", format!("Constraint::Regex(\"{}\")", re.as_str()))
-                }
-            }
-        }
-    }
-
-    impl Clone for Token {
-        fn clone(&self) -> Token {
-            Token {
-                token_type: self.token_type.clone(),
-                range: self.range.clone(),
-                slice: self.slice.clone(),
-                constraint: Constraint::Default.clone(),
-            }
-        }
-    }
-
-    impl Clone for TokenType {
-        fn clone(&self) -> TokenType {
-            match self {
-                TokenType::Static => TokenType::Static,
-                TokenType::Variable => TokenType::Variable,
-            }
-        }
-    }
-
-    impl Clone for Constraint {
-        fn clone(&self) -> Constraint {
-            match self {
-                Constraint::Default => Constraint::Default,
-                Constraint::Wildcard => Constraint::Wildcard,
-                Constraint::Regex(regex) => Constraint::Regex(Regex::new(regex.as_str()).unwrap()),
+                },
             }
         }
     }
