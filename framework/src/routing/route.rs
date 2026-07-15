@@ -128,7 +128,9 @@ impl Route {
     ) -> bool {
         let mut cursor = 0;
         let mut i = 0;
-        // if any of these checks fail, break out of loop and return false
+        let tok_len = tokens.len();
+
+        // If any of these checks fail, break out of loop and return false
         for token in tokens {
             let is_match = match token.constraint {
                 Constraint::Static => {
@@ -144,35 +146,60 @@ impl Route {
                 Constraint::Default => {
                     if let Some(found) = DEFAULT_VAR_PATTERN.find_at(req_seg, cursor) {
                         cursor = found.range().end;
+                        // todo copy from Constraint::Regex arm
                         true
                     } else {
                         false
                     }
                 }
                 Constraint::Regex(regex) => {
-                    // May need to wrap regex depending on token position.
-
-                    // if token regex is the only one, match until the end
-
-                    // if token regex is first, and has trailing tokens, find match
-                    // if none found, return false, if found, save cursor position and continue
-
-                    // if token is somewhere in the middle, start at cursor
-                    // save cursor position
-
-                    // if token is at the end, match exact with $
-                    // if match exact, continue, else return false
-
-
-                    if let Some(found) = regex.find_at(req_seg, cursor) {
-
-                        // /post/{author}.{id}.{slug}
-                        cursor = found.range().end;
-                        // figure out if match is actually correct
-                        true
+                    let is_match = if i == 0 && tok_len == 1 {
+                        // If there is only one token, match full req_seg.
+                        if let Some(found) = regex.find(req_seg) {
+                            found.as_str() == req_seg
+                        } else {
+                            false
+                        }
+                    } else if i < tok_len - 1 {
+                        // If token has proceeding tokens, find match. If none found,
+                        // return false, if found, save cursor position and continue.
+                        if let Some(found) = regex.find_at(req_seg, cursor) {
+                            if found.is_empty() {
+                                false
+                            } else if found.range().end == req_seg.len() {
+                                // The token matched until the end, but there should have
+                                // been at least one more token we needed to match.
+                                // todo:
+                                // Perhaps panic? If not here, during boot phase we can ensure that if there are
+                                // variable tokens that have other tokens following it, that the user must
+                                // add a regex constraint, other the default will match all characters.
+                                false
+                            } else {
+                                // We will assume for now it's true. We will know by end of
+                                // reconciliation if it's a match or not.
+                                cursor = found.range().start;
+                                true
+                            }
+                        } else {
+                            false
+                        }
+                    } else if i == tok_len - 1 {
+                        // if token is at the end, match exact with $
+                        // if match exact, continue, else return false
+                        if let Some(found) = regex.find_at(req_seg, cursor) {
+                            found.as_str() == req_seg
+                        } else {
+                            false
+                        }
                     } else {
-                        false
+                        unimplemented!("If this else block is hit, we missed something.");
+                    };
+
+                    if !is_match {
+                        return false
                     }
+
+                    true
                 }
                 Constraint::Wildcard => {
                     // If cursor matches start range for token.range
@@ -189,49 +216,11 @@ impl Route {
                 return false;
             }
 
-            // There is remaining unreconciled characters after all checks
-            // todo test this
-            // if cursor != req_seg.len() {
-            //     return false;
-            // }
-
             i += 1;
         }
 
         true
     }
-
-    // fn reconcile_regex<'h>(
-    //     regex: Option<Regex>,
-    //     req_seg: &str,
-    //     rou_segs: &Vec<RouteSegment>,
-    //     cursor: &mut usize,
-    // ) -> Option<Match<'h>> {
-    //     // First check that the string slice being tested only contains
-    //     // the characters allowed in the regex constraint.
-    //     // let is_match: bool;
-    //     // if let Some(regex) = &regex {
-    //     //     is_match = regex.is_match_at(req_seg, *cursor);
-    //     //     dbg!(
-    //     //         *cursor,
-    //     //         is_match,
-    //     //         regex.as_str(),
-    //     //         req_seg,
-    //     //         regex.find_at(req_seg, *cursor)
-    //     //     );
-    //     // } else {
-    //     //     is_match = DEFAULT_VAR_PATTERN.is_match_at(req_seg, *cursor);
-    //     // }
-    //     // if !is_match {
-    //     //     return false;
-    //     // }
-    //
-    //     if let Some(regex) = regex {
-    //         regex.find_at(req_seg, *cursor)
-    //     } else {
-    //         DEFAULT_VAR_PATTERN.find_at(req_seg, *cursor)
-    //     }
-    // }
 }
 
 #[derive(Debug)]
