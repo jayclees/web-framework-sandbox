@@ -2,7 +2,7 @@ use crate::routing::action::Action;
 use crate::routing::split_segments;
 use crate::routing::tokenizer::{Constraint, SegmentTokenizer, Token};
 use hyper::Method;
-use regex::{Match, Regex};
+use regex::Regex;
 use std::sync::LazyLock;
 
 static DEFAULT_VAR_PATTERN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(.*){1,}").unwrap());
@@ -108,15 +108,26 @@ impl Route {
             return false;
         }
 
-        if Self::reconcile_segs(req_seg.unwrap(), rou_seg.unwrap().tokens.clone(), depth) {
+        if Self::reconcile_segs(
+            req_seg.unwrap(),
+            rou_seg.unwrap().tokens.clone(),
+            rou_segs,
+            depth,
+        ) {
             return Self::cmp(req_segs, rou_segs, depth + 1);
         }
 
         false
     }
 
-    fn reconcile_segs(req_seg: &str, tokens: Vec<Token>, _depth: usize) -> bool {
+    fn reconcile_segs(
+        req_seg: &str,
+        tokens: Vec<Token>,
+        rou_segs: &Vec<RouteSegment>,
+        _depth: usize,
+    ) -> bool {
         let mut cursor = 0;
+        let mut i = 0;
         // if any of these checks fail, break out of loop and return false
         for token in tokens {
             let is_match = match token.constraint {
@@ -130,9 +141,38 @@ impl Route {
                         false
                     }
                 }
-                Constraint::Default => Self::reconcile_regex(None, req_seg, &mut cursor),
+                Constraint::Default => {
+                    if let Some(found) = DEFAULT_VAR_PATTERN.find_at(req_seg, cursor) {
+                        cursor = found.range().end;
+                        true
+                    } else {
+                        false
+                    }
+                }
                 Constraint::Regex(regex) => {
-                    Self::reconcile_regex(Some(regex), req_seg, &mut cursor)
+                    // May need to wrap regex depending on token position.
+
+                    // if token regex is the only one, match until the end
+
+                    // if token regex is first, and has trailing tokens, find match
+                    // if none found, return false, if found, save cursor position and continue
+
+                    // if token is somewhere in the middle, start at cursor
+                    // save cursor position
+
+                    // if token is at the end, match exact with $
+                    // if match exact, continue, else return false
+
+
+                    if let Some(found) = regex.find_at(req_seg, cursor) {
+
+                        // /post/{author}.{id}.{slug}
+                        cursor = found.range().end;
+                        // figure out if match is actually correct
+                        true
+                    } else {
+                        false
+                    }
                 }
                 Constraint::Wildcard => {
                     // If cursor matches start range for token.range
@@ -154,41 +194,44 @@ impl Route {
             // if cursor != req_seg.len() {
             //     return false;
             // }
+
+            i += 1;
         }
 
         true
     }
 
-    fn reconcile_regex(regex: Option<Regex>, req_seg: &str, cursor: &mut usize) -> bool {
-        // First check that the string slice being tested only contains
-        // the characters allowed in the regex constraint.
-        let is_match: bool;
-        if let Some(regex) = &regex {
-            is_match = regex.is_match_at(req_seg, *cursor);
-            if req_seg == "123abc" {
-                dbg!(is_match, regex.as_str(), req_seg);
-            }
-        } else {
-            is_match = DEFAULT_VAR_PATTERN.is_match_at(req_seg, *cursor);
-        }
-        if !is_match {
-            return false;
-        }
-
-        let found: Option<Match>;
-        if let Some(regex) = regex {
-            found = regex.find_at(req_seg, *cursor);
-        } else {
-            found = DEFAULT_VAR_PATTERN.find_at(req_seg, *cursor);
-        }
-
-        if let None = found {
-            false
-        } else {
-            *cursor = found.unwrap().range().end;
-            true
-        }
-    }
+    // fn reconcile_regex<'h>(
+    //     regex: Option<Regex>,
+    //     req_seg: &str,
+    //     rou_segs: &Vec<RouteSegment>,
+    //     cursor: &mut usize,
+    // ) -> Option<Match<'h>> {
+    //     // First check that the string slice being tested only contains
+    //     // the characters allowed in the regex constraint.
+    //     // let is_match: bool;
+    //     // if let Some(regex) = &regex {
+    //     //     is_match = regex.is_match_at(req_seg, *cursor);
+    //     //     dbg!(
+    //     //         *cursor,
+    //     //         is_match,
+    //     //         regex.as_str(),
+    //     //         req_seg,
+    //     //         regex.find_at(req_seg, *cursor)
+    //     //     );
+    //     // } else {
+    //     //     is_match = DEFAULT_VAR_PATTERN.is_match_at(req_seg, *cursor);
+    //     // }
+    //     // if !is_match {
+    //     //     return false;
+    //     // }
+    //
+    //     if let Some(regex) = regex {
+    //         regex.find_at(req_seg, *cursor)
+    //     } else {
+    //         DEFAULT_VAR_PATTERN.find_at(req_seg, *cursor)
+    //     }
+    // }
 }
 
 #[derive(Debug)]
@@ -229,41 +272,38 @@ mod tests {
     fn register_routes(router: &mut Router) {
         // Some of these routes are here to check that they are NOT
         // hit, so please don't remove any routes.
-        router.get("/", Generic("Landing page"));
+        router.get("/", Generic);
 
-        router.get("/home", Generic("Home page"));
-        router.get("/about", Generic("About us page"));
+        router.get("/home", Generic);
+        router.get("/about", Generic);
 
-        router.get("/home/trending", Generic("Trending page"));
-        router.get("/home/popular", Generic("Popular page"));
+        router.get("/home/trending", Generic);
+        router.get("/home/popular", Generic);
 
-        router.get("/home/settings/profile", Generic("Profile settings page"));
-        router.get(
-            "/home/settings/preferences",
-            Generic("Preferences settings page"),
-        );
+        router.get("/home/settings/profile", Generic);
+        router.get("/home/settings/preferences", Generic);
 
         // Variable testing
-        router.get("/user/index", Generic("Show user index page"));
-        router.get("/user/{user}", Generic("Show user page"));
-        router.get("/user/{user}/details", Generic("Show user details page"));
-        router.get("/user/{user}/edit", Generic("Show user edit page"));
-        router.get(
-            "/user/{user}/posts/featured",
-            Generic("Show user posts page"),
-        );
+        router.get("/user/index", Generic);
+        router.get("/user/{user}", Generic);
+        router.get("/user/{user}/details", Generic);
+        router.get("/user/{user}/edit", Generic);
+        router.get("/user/{user}/posts/featured", Generic);
 
         // For constraint testing
-        router.getm(
-            "/author/{name}",
-            Generic("Get author by name (alpha chars)"),
-            |route| route.constrain("name", "[a-zA-Z]+"),
-        );
-        router.getm(
-            "/author/{id}",
-            Generic("Get author by id (numeric chars)"),
-            |route| route.constrain("id", "[0-9]+"),
-        );
+        router.getm("/author/{name}", Generic, |route| {
+            route.constrain("name", "[a-zA-Z]+")
+        });
+        router.getm("/author/{id}", Generic, |route| {
+            route.constrain("id", "[0-9]+")
+        });
+
+        // multi-token segments
+        router.getm("/post/{author}.{post_id}.{post_title}", Generic, |route| {
+            route
+                .constrain("author", "[a-zA-Z]+")
+                .constrain("post_id", "[0-9]+")
+        });
     }
 
     #[test]
@@ -436,6 +476,11 @@ mod tests {
         let resolved = ROUTER
             .resolve_inner("/author/123abc", &Method::GET)
             .unwrap();
+
+        // /{id:numeric}
+        // /post.{id:numeric}
+        // /post.{id:numeric}.{slug:alpha_dash}
+        // /post.{id:numeric}.{slug:alpha_dash}.{year}
         if let Some(route) = resolved {
             assert!(
                 false,
@@ -445,8 +490,22 @@ mod tests {
         }
     }
 
+    #[test]
+    fn reconcile_multi_token_segments() {
+        let resolved = ROUTER
+            .resolve_inner("/post/jdoe.555.how-to-do-thing", &Method::GET)
+            .unwrap();
+        if let None = resolved {
+            assert!(false, "Route not resolved.");
+        }
+        assert_eq!(
+            "/post/{author}.{post_id}.{post_title}",
+            resolved.unwrap().path
+        );
+    }
+
     #[derive(Debug)]
-    struct Generic(&'static str);
+    struct Generic;
 
     #[async_trait]
     impl Action for Generic {
@@ -455,7 +514,7 @@ mod tests {
             _app: &App,
             _request: Request<Incoming>,
         ) -> Result<Box<dyn Responsable>, HttpError> {
-            Ok(Box::new(self.0.to_string()))
+            Ok(Box::new("hello".to_string()))
         }
     }
 }
