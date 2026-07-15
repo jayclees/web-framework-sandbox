@@ -26,9 +26,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     let router = Router::new(register_routes);
 
     let mut env = Environment::new();
-    env.set_loader(path_loader(
-        root.join("resource/template"),
-    ));
+    env.set_loader(path_loader(root.join("resource/template")));
 
     let mut opt = ConnectOptions::new(env::var("DATABASE_URL")?);
     opt.max_connections(100)
