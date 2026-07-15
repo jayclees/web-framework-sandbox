@@ -7,7 +7,8 @@ use framework::app::App;
 use framework::error::register_panic_hook;
 use framework::routing::router::Router;
 use minijinja::{path_loader, Environment};
-use sea_orm::{ConnectOptions, Database};
+use minijinja_autoreload::AutoReloader;
+use sea_orm::{ConnectOptions, Database, DatabaseConnection};
 use std::env;
 use std::error::Error;
 use std::net::SocketAddr;
@@ -24,10 +25,16 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     // Attempt to load project-root/.env
 
     let router = Router::new(register_routes);
+    let template_reloader = reloader();
+    let db = db().await?;
+    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+    let app = App::new(router, addr, template_reloader, db).await;
+    let app = Arc::new(app);
 
-    let mut env = Environment::new();
-    env.set_loader(path_loader(root.join("resource/template")));
+    framework::app::run(app).await
+}
 
+async fn db() -> Result<DatabaseConnection, Box<dyn Error + Send + Sync>> {
     let mut opt = ConnectOptions::new(env::var("DATABASE_URL")?);
     opt.max_connections(100)
         .min_connections(5)
@@ -41,10 +48,31 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     db.get_schema_registry("bus_pattern_framework::entity::*")
         .sync(&db)
         .await?;
+    Ok(db)
+}
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
-    let app = App::new(router, addr, env, db).await;
-    let app = Arc::new(app);
+fn reloader() -> AutoReloader {
+    // If DISABLE_AUTORELOAD is set, then the path tracking is disabled.
+    let disable_autoreload = env::var("DISABLE_AUTORELOAD").as_deref() == Ok("1");
 
-    framework::app::run(app).await
+    // If FAST_AUTORELOAD is set, then fast reloading is enabled.
+    let fast_autoreload = env::var("FAST_AUTORELOAD").as_deref() == Ok("1");
+
+    // The closure is invoked every time the environment is outdated to
+    // recreate it.
+    AutoReloader::new(move |notifier| {
+        let template_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resource/template");
+        let mut env = Environment::new();
+        env.set_loader(path_loader(&template_path));
+
+        if fast_autoreload {
+            notifier.set_fast_reload(true);
+        }
+
+        // if watch_path is never called, no fs watcher is created
+        if !disable_autoreload {
+            notifier.watch_path(&template_path, true);
+        }
+        Ok(env)
+    })
 }

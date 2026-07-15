@@ -17,6 +17,7 @@ sea-orm = {
 }
 dotenvy = "0.15.7"
 log = "0.4.33"
+minijinja-autoreload = "2.21.0"
 
 [workspace]
 resolver = "3"

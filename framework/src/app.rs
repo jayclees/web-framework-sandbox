@@ -8,7 +8,7 @@ use hyper::service::service_fn;
 use hyper::{Request, Response};
 use hyper_util::rt::TokioIo;
 use hyper_util::server::conn::auto;
-use minijinja::Environment;
+use minijinja_autoreload::AutoReloader;
 use sea_orm::DatabaseConnection;
 use serde_json::json;
 use std::error::Error;
@@ -32,7 +32,7 @@ impl Env {
 pub struct App {
     router: Arc<Router>,
     listener: TcpListener,
-    template: Environment<'static>,
+    template: AutoReloader,
     db: Option<DatabaseConnection>,
     env: Env,
 }
@@ -41,7 +41,7 @@ impl App {
     pub async fn new(
         router: Router,
         addr: SocketAddr,
-        template: Environment<'static>,
+        template: AutoReloader,
         db: DatabaseConnection,
     ) -> App {
         App {
@@ -60,7 +60,7 @@ impl App {
         &self.listener
     }
 
-    pub fn template(&self) -> &Environment<'static> {
+    pub fn template(&self) -> &AutoReloader {
         &self.template
     }
 
@@ -107,6 +107,8 @@ impl App {
             .to_string()
         } else {
             self.template
+                .acquire_env()
+                .unwrap()
                 .get_template("errors/default.html")
                 .unwrap()
                 // todo WARNING: be careful what we send to client here.

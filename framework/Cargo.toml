@@ -16,3 +16,4 @@ chrono = "0.4.45"
 serde_json = "1.0.150"
 async-trait = "0.1.89"
 serde = { version = "1.0.228", features = ["derive"] }
+minijinja-autoreload = "2.21.0"
