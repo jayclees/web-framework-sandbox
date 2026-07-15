@@ -220,12 +220,6 @@ impl<'a> SegmentReconciliator<'a> {
                                 // We will assume for now it's true. We will know by end of
                                 // this segment's reconciliation if it's a match or not.
                                 cursor = found.range().end;
-                                if self.route.path == "/post/{author}.{post_id}.{post_title}" && self.depth == 2 && i == 0 {
-                                    println!("1: cursor({cursor}) match({})", &req_seg[found.range().clone()]);
-                                }
-                                if self.route.path == "/post/{author}.{post_id}.{post_title}" && self.depth == 2 && i == 2 {
-                                    println!("3: cursor({cursor})");
-                                }
                                 true
                             }
                         } else {
