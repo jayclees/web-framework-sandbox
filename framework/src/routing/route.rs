@@ -76,10 +76,7 @@ impl Route {
     }
 
     pub fn matches(&self, path: &str) -> bool {
-        let req_segs = split_segments(path.to_owned());
-        let rou_segs = &self.segments;
-
-        SegmentReconciliator::new(req_segs, self).cmp()
+        SegmentReconciliator::new(split_segments(path.to_owned()), self).cmp()
     }
 }
 
@@ -179,7 +176,9 @@ impl<'a> SegmentReconciliator<'a> {
                 Constraint::Default => {
                     if let Some(found) = DEFAULT_VAR_PATTERN.find_at(req_seg, cursor) {
                         cursor = found.range().end;
-                        // todo copy from Constraint::Regex arm
+                        // todo copy from Constraint::Regex arm?
+                        // Maybe not required, since it'll be assumed default
+                        // catches everything until the end of the segment.
                         true
                     } else {
                         false
@@ -227,7 +226,14 @@ impl<'a> SegmentReconciliator<'a> {
                         // If token is the last one, match exactly. If the
                         // match is exact, continue, else return false.
                         if let Some(found) = regex.find_at(req_seg, cursor) {
-                            found.as_str() == req_seg
+                            let is_match = found.as_str() == &req_seg[cursor..];
+
+                            if is_match {
+                                cursor = req_seg.len();
+                                true
+                            } else {
+                                false
+                            }
                         } else {
                             false
                         }
@@ -475,6 +481,39 @@ mod tests {
         );
     }
 
+    #[test]
+    fn resolve_trailing_var_constrained() {
+        let resolved = ROUTER
+            .resolve_inner("/home/app-my-custom-slug", &Method::GET)
+            .unwrap();
+        if let None = resolved {
+            assert!(false, "Route not resolved.");
+        }
+        assert_eq!("/home/app-{trailing_var}", resolved.unwrap().path);
+    }
+
+    #[test]
+    fn resolve_trailing_var_not_constrained() {
+        let resolved = ROUTER
+            .resolve_inner("/home/app2-my-custom-slug", &Method::GET)
+            .unwrap();
+        if let None = resolved {
+            assert!(false, "Route not resolved.");
+        }
+        assert_eq!("/home/app2-{trailing_var}", resolved.unwrap().path);
+    }
+
+    #[test]
+    fn resolve_leading_var_constrained() {
+        let resolved = ROUTER
+            .resolve_inner("/home/custompagename-page", &Method::GET)
+            .unwrap();
+        if let None = resolved {
+            assert!(false, "Route not resolved.");
+        }
+        assert_eq!("/home/{leading_var}-page", resolved.unwrap().path);
+    }
+
     fn register_routes(router: &mut Router) {
         // Some of these routes are here to check that they are NOT
         // hit, so please don't remove any routes.
@@ -504,16 +543,30 @@ mod tests {
             route.constrain("id", "[0-9]+")
         });
 
-        // multi-token segments
+        // Multi-token segments
+        // This route is here to ensure it doesn't get hit
+        // when attempting to hit the following route.
         router.getm("/post/{author}.", Generic, |route| {
             route.constrain("author", "[a-zA-Z]+")
-            // .constrain("post_id", "[0-9]+")
         });
         router.getm("/post/{author}.{post_id}.{post_title}", Generic, |route| {
             route
                 .constrain("author", "[a-zA-Z]+")
                 .constrain("post_id", "[0-9]+")
         });
+        router.getm("/home/app-{trailing_var}", Generic, |route| {
+            route.constrain("trailing_var", "[a-zA-Z-]+")
+        });
+        router.get("/home/app2-{trailing_var}", Generic);
+        router.getm("/home/{leading_var}-page", Generic, |route| {
+            route.constrain("leading_var", "[a-zA-Z]+")
+        });
+
+        // wildcard testing
+        router.getm("/app/leading-static-{slug}", Generic, |route| {
+            route.wildcard("slug", true)
+        });
+        router.getm("/app/{slug}", Generic, |route| route.wildcard("slug", true));
     }
 
     #[derive(Debug)]
