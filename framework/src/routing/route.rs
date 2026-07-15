@@ -130,7 +130,7 @@ impl Route {
         let mut i = 0;
         let tok_len = tokens.len();
 
-        // If any of these checks fail, break out of loop and return false
+        // If any of these checks fail, break out of loop and return false.
         for token in tokens {
             let is_match = match token.constraint {
                 Constraint::Static => {
@@ -176,7 +176,7 @@ impl Route {
                                 false
                             } else {
                                 // We will assume for now it's true. We will know by end of
-                                // reconciliation if it's a match or not.
+                                // this segment's reconciliation if it's a match or not.
                                 cursor = found.range().start;
                                 true
                             }
@@ -184,8 +184,8 @@ impl Route {
                             false
                         }
                     } else if i == tok_len - 1 {
-                        // if token is at the end, match exact with $
-                        // if match exact, continue, else return false
+                        // If token is the last one, match exactly. If the
+                        // match is exact, continue, else return false.
                         if let Some(found) = regex.find_at(req_seg, cursor) {
                             found.as_str() == req_seg
                         } else {
@@ -257,43 +257,6 @@ mod tests {
     use std::sync::LazyLock;
 
     static ROUTER: LazyLock<Router> = LazyLock::new(|| Router::new(register_routes));
-
-    fn register_routes(router: &mut Router) {
-        // Some of these routes are here to check that they are NOT
-        // hit, so please don't remove any routes.
-        router.get("/", Generic);
-
-        router.get("/home", Generic);
-        router.get("/about", Generic);
-
-        router.get("/home/trending", Generic);
-        router.get("/home/popular", Generic);
-
-        router.get("/home/settings/profile", Generic);
-        router.get("/home/settings/preferences", Generic);
-
-        // Variable testing
-        router.get("/user/index", Generic);
-        router.get("/user/{user}", Generic);
-        router.get("/user/{user}/details", Generic);
-        router.get("/user/{user}/edit", Generic);
-        router.get("/user/{user}/posts/featured", Generic);
-
-        // For constraint testing
-        router.getm("/author/{name}", Generic, |route| {
-            route.constrain("name", "[a-zA-Z]+")
-        });
-        router.getm("/author/{id}", Generic, |route| {
-            route.constrain("id", "[0-9]+")
-        });
-
-        // multi-token segments
-        router.getm("/post/{author}.{post_id}.{post_title}", Generic, |route| {
-            route
-                .constrain("author", "[a-zA-Z]+")
-                .constrain("post_id", "[0-9]+")
-        });
-    }
 
     #[test]
     fn resolve_landing_route() {
@@ -491,6 +454,48 @@ mod tests {
             "/post/{author}.{post_id}.{post_title}",
             resolved.unwrap().path
         );
+    }
+
+    fn register_routes(router: &mut Router) {
+        // Some of these routes are here to check that they are NOT
+        // hit, so please don't remove any routes.
+        router.get("/", Generic);
+
+        router.get("/home", Generic);
+        router.get("/about", Generic);
+
+        router.get("/home/trending", Generic);
+        router.get("/home/popular", Generic);
+
+        router.get("/home/settings/profile", Generic);
+        router.get("/home/settings/preferences", Generic);
+
+        // Variable testing
+        router.get("/user/index", Generic);
+        router.get("/user/{user}", Generic);
+        router.get("/user/{user}/details", Generic);
+        router.get("/user/{user}/edit", Generic);
+        router.get("/user/{user}/posts/featured", Generic);
+
+        // For constraint testing
+        router.getm("/author/{name}", Generic, |route| {
+            route.constrain("name", "[a-zA-Z]+")
+        });
+        router.getm("/author/{id}", Generic, |route| {
+            route.constrain("id", "[0-9]+")
+        });
+
+        // multi-token segments
+        router.getm("/post/{author}.", Generic, |route| {
+            route
+                .constrain("author", "[a-zA-Z]+")
+                // .constrain("post_id", "[0-9]+")
+        });
+        router.getm("/post/{author}.{post_id}.{post_title}", Generic, |route| {
+            route
+                .constrain("author", "[a-zA-Z]+")
+                .constrain("post_id", "[0-9]+")
+        });
     }
 
     #[derive(Debug)]
