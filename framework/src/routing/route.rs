@@ -23,7 +23,7 @@ impl Route {
             name: None,
             method,
             path: path.clone(),
-            segments: process_segments(split_segments(path)),
+            segments: RouteSegment::process_segments(split_segments(path)),
             action: Box::new(action),
         }
     }
@@ -96,13 +96,13 @@ impl RouteSegment {
             tokens: SegmentTokenizer::new(seg).tokenize(),
         }
     }
-}
 
-fn process_segments(segments: Vec<String>) -> Vec<RouteSegment> {
-    segments
-        .into_iter()
-        .map(|seg| RouteSegment::new(seg))
-        .collect()
+    fn process_segments(segments: Vec<String>) -> Vec<RouteSegment> {
+        segments
+            .into_iter()
+            .map(|seg| RouteSegment::new(seg))
+            .collect()
+    }
 }
 
 struct SegmentReconciliator<'a> {
