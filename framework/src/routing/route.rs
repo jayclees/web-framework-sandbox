@@ -79,12 +79,52 @@ impl Route {
         let req_segs = split_segments(path.to_owned());
         let rou_segs = &self.segments;
 
-        Self::cmp(req_segs, rou_segs, 0)
+        SegmentReconciliator::new(req_segs, self).cmp()
+    }
+}
+
+#[derive(Debug)]
+struct RouteSegment {
+    _segment: String,
+    tokens: Vec<Token>,
+}
+
+impl RouteSegment {
+    pub fn new(seg: String) -> RouteSegment {
+        RouteSegment {
+            _segment: seg.clone(),
+            tokens: SegmentTokenizer::new(seg).tokenize(),
+        }
+    }
+}
+
+fn process_segments(segments: Vec<String>) -> Vec<RouteSegment> {
+    segments
+        .into_iter()
+        .map(|seg| RouteSegment::new(seg))
+        .collect()
+}
+
+struct SegmentReconciliator<'a> {
+    route: &'a Route,
+    req_segs: Vec<String>,
+    rou_segs: &'a Vec<RouteSegment>,
+    depth: usize,
+}
+
+impl<'a> SegmentReconciliator<'a> {
+    fn new(req_segs: Vec<String>, route: &'a Route) -> SegmentReconciliator<'a> {
+        SegmentReconciliator {
+            route,
+            req_segs,
+            rou_segs: &route.segments,
+            depth: 0,
+        }
     }
 
-    fn cmp(req_segs: Vec<String>, rou_segs: &Vec<RouteSegment>, depth: usize) -> bool {
-        let req_seg = req_segs.iter().nth(depth);
-        let rou_seg = rou_segs.iter().nth(depth);
+    fn cmp(&mut self) -> bool {
+        let req_seg = self.req_segs.iter().nth(self.depth);
+        let rou_seg = self.rou_segs.iter().nth(self.depth);
 
         // Recursive checks reached all the way to the end without failing, and both
         // ended at the same depth. This means we've found a match. Return true.
@@ -108,31 +148,22 @@ impl Route {
             return false;
         }
 
-        if Self::reconcile_segs(
-            req_seg.unwrap(),
-            rou_seg.unwrap().tokens.clone(),
-            rou_segs,
-            depth,
-        ) {
-            return Self::cmp(req_segs, rou_segs, depth + 1);
+        if self.reconcile_segs(req_seg.unwrap(), &rou_seg.unwrap().tokens) {
+            self.depth += 1;
+            return self.cmp();
         }
 
         false
     }
 
-    fn reconcile_segs(
-        req_seg: &str,
-        tokens: Vec<Token>,
-        rou_segs: &Vec<RouteSegment>,
-        _depth: usize,
-    ) -> bool {
+    fn reconcile_segs(&self, req_seg: &str, tokens: &Vec<Token>) -> bool {
         let mut cursor = 0;
         let mut i = 0;
         let tok_len = tokens.len();
 
         // If any of these checks fail, break out of loop and return false.
         for token in tokens {
-            let is_match = match token.constraint {
+            let is_match = match &token.constraint {
                 Constraint::Static => {
                     let slices_match = req_seg.len() >= token.range.end
                         && &req_seg[token.range.clone()] == token.slice;
@@ -196,7 +227,7 @@ impl Route {
                     };
 
                     if !is_match {
-                        return false
+                        return false;
                     }
 
                     true
@@ -221,28 +252,6 @@ impl Route {
 
         true
     }
-}
-
-#[derive(Debug)]
-struct RouteSegment {
-    _segment: String,
-    tokens: Vec<Token>,
-}
-
-impl RouteSegment {
-    pub fn new(seg: String) -> RouteSegment {
-        RouteSegment {
-            _segment: seg.clone(),
-            tokens: SegmentTokenizer::new(seg).tokenize(),
-        }
-    }
-}
-
-fn process_segments(segments: Vec<String>) -> Vec<RouteSegment> {
-    segments
-        .into_iter()
-        .map(|seg| RouteSegment::new(seg))
-        .collect()
 }
 
 #[cfg(test)]
@@ -487,9 +496,8 @@ mod tests {
 
         // multi-token segments
         router.getm("/post/{author}.", Generic, |route| {
-            route
-                .constrain("author", "[a-zA-Z]+")
-                // .constrain("post_id", "[0-9]+")
+            route.constrain("author", "[a-zA-Z]+")
+            // .constrain("post_id", "[0-9]+")
         });
         router.getm("/post/{author}.{post_id}.{post_title}", Generic, |route| {
             route
