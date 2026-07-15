@@ -22,8 +22,6 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     register_panic_hook(root.clone());
     dotenvy::dotenv()?;
 
-    // Attempt to load project-root/.env
-
     let router = Router::new(register_routes);
     let template_reloader = reloader();
     let db = db().await?;
@@ -44,7 +42,7 @@ async fn db() -> Result<DatabaseConnection, Box<dyn Error + Send + Sync>> {
         .max_lifetime(Duration::from_secs(8))
         .sqlx_logging(false) // disable SQLx logging
         .sqlx_logging_level(log::LevelFilter::Info);
-    let db = Database::connect(opt).await.unwrap();
+    let db = Database::connect(opt).await?;
     db.get_schema_registry("bus_pattern_framework::entity::*")
         .sync(&db)
         .await?;
