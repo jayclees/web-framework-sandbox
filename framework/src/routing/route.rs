@@ -106,7 +106,7 @@ fn process_segments(segments: Vec<String>) -> Vec<RouteSegment> {
 }
 
 struct SegmentReconciliator<'a> {
-    route: &'a Route,
+    _route: &'a Route,
     req_segs: Vec<String>,
     rou_segs: &'a Vec<RouteSegment>,
     depth: usize,
@@ -116,7 +116,7 @@ impl<'a> SegmentReconciliator<'a> {
     fn new(req_segs: Vec<String>, route: &'a Route) -> SegmentReconciliator<'a> {
         // dbg!(&route.path); // Uncomment this to see which route you are in when debugging
         SegmentReconciliator {
-            route,
+            _route: route,
             req_segs,
             rou_segs: &route.segments,
             depth: 0,
@@ -166,11 +166,9 @@ impl<'a> SegmentReconciliator<'a> {
         for token in &rou_seg.tokens {
             let is_match = match &token.constraint {
                 Constraint::Static => {
-
                     let start = cursor;
                     let end = cursor + token.slice.len();
-                    let slices_match = req_seg.len() >= end
-                        && &req_seg[start..end] == token.slice;
+                    let slices_match = req_seg.len() >= end && &req_seg[start..end] == token.slice;
                     if slices_match {
                         cursor += token.slice.len();
                         true
