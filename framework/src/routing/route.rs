@@ -114,6 +114,7 @@ struct SegmentReconciliator<'a> {
 
 impl<'a> SegmentReconciliator<'a> {
     fn new(req_segs: Vec<String>, route: &'a Route) -> SegmentReconciliator<'a> {
+        // dbg!(&route.path); // Uncomment this to see which route you are in when debugging
         SegmentReconciliator {
             route,
             req_segs,
@@ -148,7 +149,7 @@ impl<'a> SegmentReconciliator<'a> {
             return false;
         }
 
-        if self.reconcile_segs(req_seg.unwrap(), &rou_seg.unwrap().tokens) {
+        if self.reconcile_segs(req_seg.unwrap(), &rou_seg.unwrap()) {
             self.depth += 1;
             return self.cmp();
         }
@@ -156,19 +157,22 @@ impl<'a> SegmentReconciliator<'a> {
         false
     }
 
-    fn reconcile_segs(&self, req_seg: &str, tokens: &Vec<Token>) -> bool {
+    fn reconcile_segs(&self, req_seg: &str, rou_seg: &RouteSegment) -> bool {
         let mut cursor = 0;
         let mut i = 0;
-        let tok_len = tokens.len();
+        let tok_len = rou_seg.tokens.len();
 
         // If any of these checks fail, break out of loop and return false.
-        for token in tokens {
+        for token in &rou_seg.tokens {
             let is_match = match &token.constraint {
                 Constraint::Static => {
-                    let slices_match = req_seg.len() >= token.range.end
-                        && &req_seg[token.range.clone()] == token.slice;
+
+                    let start = cursor;
+                    let end = cursor + token.slice.len();
+                    let slices_match = req_seg.len() >= end
+                        && &req_seg[start..end] == token.slice;
                     if slices_match {
-                        cursor = token.range.end;
+                        cursor += token.slice.len();
                         true
                     } else {
                         false
@@ -187,7 +191,14 @@ impl<'a> SegmentReconciliator<'a> {
                     let is_match = if i == 0 && tok_len == 1 {
                         // If there is only one token, match full req_seg.
                         if let Some(found) = regex.find(req_seg) {
-                            found.as_str() == req_seg
+                            if found.as_str() == req_seg {
+                                // After the loop ends the cursor being at
+                                // end means everything properly matched.
+                                cursor = found.as_str().len();
+                                true
+                            } else {
+                                false
+                            }
                         } else {
                             false
                         }
@@ -208,7 +219,13 @@ impl<'a> SegmentReconciliator<'a> {
                             } else {
                                 // We will assume for now it's true. We will know by end of
                                 // this segment's reconciliation if it's a match or not.
-                                cursor = found.range().start;
+                                cursor = found.range().end;
+                                if self.route.path == "/post/{author}.{post_id}.{post_title}" && self.depth == 2 && i == 0 {
+                                    println!("1: cursor({cursor}) match({})", &req_seg[found.range().clone()]);
+                                }
+                                if self.route.path == "/post/{author}.{post_id}.{post_title}" && self.depth == 2 && i == 2 {
+                                    println!("3: cursor({cursor})");
+                                }
                                 true
                             }
                         } else {
@@ -250,7 +267,8 @@ impl<'a> SegmentReconciliator<'a> {
             i += 1;
         }
 
-        true
+        // If cursor is less than req seg len, match was invalid
+        cursor == req_seg.len()
     }
 }
 
@@ -454,7 +472,7 @@ mod tests {
     #[test]
     fn reconcile_multi_token_segments() {
         let resolved = ROUTER
-            .resolve_inner("/post/jdoe.555.how-to-do-thing", &Method::GET)
+            .resolve_inner("/post/johndoe.123456789.how-to-do-thing", &Method::GET)
             .unwrap();
         if let None = resolved {
             assert!(false, "Route not resolved.");
