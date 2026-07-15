@@ -17,19 +17,20 @@ use std::time::Duration;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
-    register_panic_hook();
+    let root = PathBuf::from(env::var("CARGO_MANIFEST_DIR")?);
+    register_panic_hook(root.clone());
+    dotenvy::dotenv()?;
 
     // Attempt to load project-root/.env
-    dotenvy::dotenv().unwrap();
 
     let router = Router::new(register_routes);
 
     let mut env = Environment::new();
     env.set_loader(path_loader(
-        PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("resource/template"),
+        root.join("resource/template"),
     ));
 
-    let mut opt = ConnectOptions::new(env::var("DATABASE_URL").unwrap());
+    let mut opt = ConnectOptions::new(env::var("DATABASE_URL")?);
     opt.max_connections(100)
         .min_connections(5)
         .connect_timeout(Duration::from_secs(8))
