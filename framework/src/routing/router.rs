@@ -1,8 +1,8 @@
+use crate::action::Action;
+use crate::error::HttpError;
+use crate::routing::route::Route;
 use hyper::body::Incoming;
 use hyper::{Method, Request};
-use crate::error::HttpError;
-use crate::routing::action::Action;
-use crate::routing::route::Route;
 
 #[derive(Debug)]
 pub struct Router {
@@ -36,11 +36,7 @@ impl Router {
         self
     }
 
-    pub fn get<A: Action + 'static>(
-        &mut self,
-        path: &str,
-        action: A,
-    ) -> &mut Router {
+    pub fn get<A: Action + 'static>(&mut self, path: &str, action: A) -> &mut Router {
         self.add(Method::GET, path, action, None);
 
         self

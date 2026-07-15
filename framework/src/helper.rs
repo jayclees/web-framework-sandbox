@@ -18,3 +18,7 @@ macro_rules! get_line {
 }
 
 pub use get_line;
+
+fn respond() {
+
+}

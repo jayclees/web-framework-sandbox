@@ -5,9 +5,31 @@ use hyper::Request;
 use sea_orm::EntityTrait;
 use serde::Serialize;
 use serde_json::json;
+use framework::action::{Action, Responsable};
 use framework::app::App;
 use framework::error::HttpError;
-use framework::routing::action::{Action, Responsable};
+
+#[derive(Debug)]
+pub struct StandardPage {
+    title: String,
+}
+
+#[async_trait]
+impl Action for StandardPage {
+    async fn handle(
+        &self,
+        app: &App,
+        _request: Request<Incoming>,
+    ) -> Result<Box<dyn Responsable>, HttpError> {
+        let template = app.template().get_template("landing.html").unwrap();
+        let result = template.render(ExampleStruct {
+            app_title: "Bus Web Framework".to_string(),
+            name: "John Doe".to_string(),
+        });
+
+        framework::action::text(result.unwrap())
+    }
+}
 
 #[derive(Debug)]
 pub struct ShowLanding;
