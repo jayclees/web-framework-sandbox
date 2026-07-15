@@ -7,16 +7,16 @@ use crate::action::pages::{
 pub fn register_routes(router: &mut Router) -> () {
     router.getm("/".to_owned(), ShowLanding, |route| route.name("landing".to_owned()));
     router.get("/about".to_owned(), ShowAbout);
-    // router.get("/deeply/nested/route", ShowDeeplyNestedRoute);
-    // router.get("/json-array", ShowNumberArray);
-    // router.get("/json", ShowJson);
-    // router.get("/html", ShowHtml);
-    // router.get("/user/{user}", ShowUser);
-    // // router.get("/user/{user}/post/{post}", ShowUser);
-    // router.get("/error", ShowErrorPage);
-    // router.getm(
-    //     "/home/app-{wildcard}",
-    //     ServeApp,
-    //     |route| route.constrain("wildcard", "asdf"),
-    // );
+    router.get("/deeply/nested/route".to_owned(), ShowDeeplyNestedRoute);
+    router.get("/json-array".to_owned(), ShowNumberArray);
+    router.get("/json".to_owned(), ShowJson);
+    router.get("/html".to_owned(), ShowHtml);
+    router.get("/user/{user}".to_owned(), ShowUser);
+    // router.get("/user/{user}/post/{post}".to_owned(), ShowUser);
+    router.get("/error".to_owned(), ShowErrorPage);
+    router.getm(
+        "/home/app-{wildcard}".to_owned(),
+        ServeApp,
+        |route| route.constrain("wildcard", "asdf"),
+    );
 }

@@ -94,7 +94,7 @@ impl SegmentTokenizer {
                                 }
                                 // Previous variable token already closed, push new static token instead
                                 _ => {
-                                    tokens.push(Token::new_var(
+                                    tokens.push(Token::new_stat(
                                         self.state_start..i + 1,
                                         self.segment[self.state_start..i + 1].to_owned(),
                                     ));
@@ -278,10 +278,7 @@ mod tests {
     fn single_stat() -> Result<(), String> {
         let segment = "test".to_owned();
         cmp_token_arr(
-            vec![Token::new_stat(
-                0..segment.len(),
-                segment[0..segment.len()].to_owned(),
-            )],
+            vec![Token::new_stat(0..segment.len(), "test".to_owned())],
             SegmentTokenizer::new(segment).tokenize(),
             get_line!(),
         )
@@ -290,10 +287,7 @@ mod tests {
     #[test]
     fn single_var() -> Result<(), String> {
         let segment = "{var}".to_owned();
-        let expect = vec![Token::new_var(
-            0..segment.len(),
-            segment[0..segment.len()].to_owned(),
-        )];
+        let expect = vec![Token::new_var(0..segment.len(), "{var}".to_owned())];
         cmp_token_arr(
             expect,
             SegmentTokenizer::new(segment).tokenize(),
@@ -304,10 +298,7 @@ mod tests {
     #[test]
     fn underscore_number_in_var() -> Result<(), String> {
         let segment = "{var_1}".to_owned();
-        let expect = vec![Token::new_var(
-            0..segment.len(),
-            segment[0..segment.len()].to_owned(),
-        )];
+        let expect = vec![Token::new_var(0..segment.len(), "{var_1}".to_owned())];
         cmp_token_arr(
             expect,
             SegmentTokenizer::new(segment).tokenize(),
@@ -319,8 +310,8 @@ mod tests {
     fn dash_in_stat() -> Result<(), String> {
         let segment = "test-{var1}".to_owned();
         let expect = vec![
-            Token::new_stat(0..5, segment[0..5].to_owned()),
-            Token::new_var(5..segment.len(), segment[5..segment.len()].to_owned()),
+            Token::new_stat(0..5, "test-".to_owned()),
+            Token::new_var(5..segment.len(), "{var1}".to_owned()),
         ];
         cmp_token_arr(
             expect,
@@ -333,8 +324,8 @@ mod tests {
     fn var_to_stat() -> Result<(), String> {
         let segment = "{var}-end".to_owned();
         let expect = vec![
-            Token::new_var(0..5, segment[0..5].to_owned()),
-            Token::new_stat(5..segment.len(), segment[5..segment.len()].to_owned()),
+            Token::new_var(0..5, "{var}".to_owned()),
+            Token::new_stat(5..segment.len(), "-end".to_owned()),
         ];
         cmp_token_arr(
             expect,
@@ -347,9 +338,9 @@ mod tests {
     fn stat_var_stat() -> Result<(), String> {
         let segment = "test-{var1}-t2".to_owned();
         let expect = vec![
-            Token::new_stat(0..5, segment[0..5].to_owned()),
-            Token::new_var(5..11, segment[5..11].to_owned()),
-            Token::new_stat(11..segment.len(), segment[11..segment.len()].to_owned()),
+            Token::new_stat(0..5, "test-".to_owned()),
+            Token::new_var(5..11, "{var1}".to_owned()),
+            Token::new_stat(11..segment.len(), "-t2".to_owned()),
         ];
         cmp_token_arr(
             expect,
@@ -362,10 +353,10 @@ mod tests {
     fn stat_var_stat_var() -> Result<(), String> {
         let segment = "test-{var1}t2{var_2}".to_owned();
         let expect = vec![
-            Token::new_stat(0..5, segment[0..5].to_owned()),
-            Token::new_var(5..11, segment[5..11].to_owned()),
-            Token::new_stat(11..13, segment[11..13].to_owned()),
-            Token::new_var(13..segment.len(), segment[13..segment.len()].to_owned()),
+            Token::new_stat(0..5, "test-".to_owned()),
+            Token::new_var(5..11, "{var1}".to_owned()),
+            Token::new_stat(11..13, "t2".to_owned()),
+            Token::new_var(13..segment.len(), "{var_2}".to_owned()),
         ];
         cmp_token_arr(
             expect,
@@ -378,11 +369,11 @@ mod tests {
     fn stat_var_stat_var_stat() -> Result<(), String> {
         let segment = "test-{var1}t2{var_2}-end".to_owned();
         let expect = vec![
-            Token::new_stat(0..5, segment[0..5].to_owned()),
-            Token::new_var(5..11, segment[5..11].to_owned()),
-            Token::new_stat(11..13, segment[11..13].to_owned()),
-            Token::new_var(13..20, segment[13..20].to_owned()),
-            Token::new_stat(20..segment.len(), segment[20..segment.len()].to_owned()),
+            Token::new_stat(0..5, "test-".to_owned()),
+            Token::new_var(5..11, "{var1}".to_owned()),
+            Token::new_stat(11..13, "t2".to_owned()),
+            Token::new_var(13..20, "{var_2}".to_owned()),
+            Token::new_stat(20..segment.len(), "-end".to_owned()),
         ];
         cmp_token_arr(
             expect,
@@ -395,7 +386,7 @@ mod tests {
     fn stranded_open_curly() -> Result<(), String> {
         // Treat open brace as static if end of str
         let segment = "test{".to_owned();
-        let expect = vec![Token::new_stat(0..5, segment[0..5].to_owned())];
+        let expect = vec![Token::new_stat(0..5, "test{".to_owned())];
         cmp_token_arr(
             expect,
             SegmentTokenizer::new(segment).tokenize(),
@@ -407,7 +398,7 @@ mod tests {
     fn stranded_close_curly() -> Result<(), String> {
         // Treat close brace as static if end of str
         let segment = "test}".to_owned();
-        let expect = vec![Token::new_stat(0..5, segment[0..5].to_owned())];
+        let expect = vec![Token::new_stat(0..5, "test}".to_owned())];
         cmp_token_arr(
             expect,
             SegmentTokenizer::new(segment).tokenize(),
@@ -418,7 +409,7 @@ mod tests {
     #[test]
     fn empty_curly() -> Result<(), String> {
         let segment = "{}".to_owned();
-        let expect = vec![Token::new_stat(0..2, segment[0..2].to_owned())];
+        let expect = vec![Token::new_stat(0..2, "{}".to_owned())];
         cmp_token_arr(
             expect,
             SegmentTokenizer::new(segment).tokenize(),
@@ -430,7 +421,7 @@ mod tests {
     fn empty_curly_with_leading_stat() -> Result<(), String> {
         // Treat empty curly braces as static chars
         let segment = "test{}".to_owned();
-        let expect = vec![Token::new_stat(0..6, segment[0..6].to_owned())];
+        let expect = vec![Token::new_stat(0..6, "test{}".to_owned())];
         cmp_token_arr(
             expect,
             SegmentTokenizer::new(segment).tokenize(),
@@ -442,7 +433,7 @@ mod tests {
     fn empty_curly_with_trailing_stat() -> Result<(), String> {
         // Treat empty curly braces as static chars
         let segment = "{}test".to_owned();
-        let expect = vec![Token::new_stat(0..6, segment[0..6].to_owned())];
+        let expect = vec![Token::new_stat(0..6, "{}test".to_owned())];
         cmp_token_arr(
             expect,
             SegmentTokenizer::new(segment).tokenize(),
@@ -454,8 +445,8 @@ mod tests {
     fn stranded_open_curly_into_var() -> Result<(), String> {
         let segment = "{test{actual_var}".to_owned();
         let expect = vec![
-            Token::new_stat(0..5, segment[0..5].to_owned()),
-            Token::new_var(5..segment.len(), segment[5..segment.len()].to_owned()),
+            Token::new_stat(0..5, "{test".to_owned()),
+            Token::new_var(5..segment.len(), "{actual_var}".to_owned()),
         ];
         cmp_token_arr(
             expect,
@@ -468,8 +459,8 @@ mod tests {
     fn stranded_open_curly_into_var_2() -> Result<(), String> {
         let segment = "test{test{actual_var}".to_owned();
         let expect = vec![
-            Token::new_stat(0..9, segment[0..9].to_owned()),
-            Token::new_var(9..segment.len(), segment[9..segment.len()].to_owned()),
+            Token::new_stat(0..9, "test{test".to_owned()),
+            Token::new_var(9..segment.len(), "{actual_var}".to_owned()),
         ];
         cmp_token_arr(
             expect,
@@ -482,8 +473,23 @@ mod tests {
     fn stranded_open_curly_into_var_3() -> Result<(), String> {
         let segment = "test{{actual_var}".to_owned();
         let expect = vec![
-            Token::new_stat(0..5, segment[0..5].to_owned()),
-            Token::new_var(5..segment.len(), segment[5..segment.len()].to_owned()),
+            Token::new_stat(0..5, "test{".to_owned()),
+            Token::new_var(5..segment.len(), "{actual_var}".to_owned()),
+        ];
+        cmp_token_arr(
+            expect,
+            SegmentTokenizer::new(segment).tokenize(),
+            get_line!(),
+        )
+    }
+
+    #[test]
+    fn stranded_open_curly_into_var_4() -> Result<(), String> {
+        let segment = "test{test{actual_var}test}test}".to_owned();
+        let expect = vec![
+            Token::new_stat(0..9, "test{test".to_owned()),
+            Token::new_var(9..21, "{actual_var}".to_owned()),
+            Token::new_stat(21..31, "test}test}".to_owned()),
         ];
         cmp_token_arr(
             expect,
@@ -495,35 +501,51 @@ mod tests {
     #[test]
     fn stranded_open_into_empty_curlies() -> Result<(), String> {
         let segment = "{{}".to_owned();
-        let expect = vec![Token::new_stat(0..3, segment[0..3].to_owned())];
-        cmp_token_arr(expect, SegmentTokenizer::new(segment).tokenize(), get_line!())
+        let expect = vec![Token::new_stat(0..3, "{{}".to_owned())];
+        cmp_token_arr(
+            expect,
+            SegmentTokenizer::new(segment).tokenize(),
+            get_line!(),
+        )
     }
 
     #[test]
     fn empty_curlies_wrapped_by_stranded_curlies() -> Result<(), String> {
         let segment = "{{}}".to_owned();
-        let expect = vec![Token::new_stat(0..4, segment[0..4].to_owned())];
-        cmp_token_arr(expect, SegmentTokenizer::new(segment).tokenize(), get_line!())
+        let expect = vec![Token::new_stat(0..4, "{{}}".to_owned())];
+        cmp_token_arr(
+            expect,
+            SegmentTokenizer::new(segment).tokenize(),
+            get_line!(),
+        )
     }
 
     #[test]
     fn empty_curlies_wrapped_by_stranded_curlies_2() -> Result<(), String> {
         let segment = "{{{}}}".to_owned();
-        let expect = vec![Token::new_stat(0..6, segment[0..6].to_owned())];
-        cmp_token_arr(expect, SegmentTokenizer::new(segment).tokenize(), get_line!())
+        let expect = vec![Token::new_stat(0..6, "{{{}}}".to_owned())];
+        cmp_token_arr(
+            expect,
+            SegmentTokenizer::new(segment).tokenize(),
+            get_line!(),
+        )
     }
 
     #[test]
     fn author_post_id_post_slug_segment() -> Result<(), String> {
         let segment = "{author}.{post_id}.{slug}".to_owned();
         let expect = vec![
-            Token::new_var(0..8, segment[0..8].to_owned()),
-            Token::new_stat(8..9, segment[8..9].to_owned()),
-            Token::new_var(9..18, segment[9..18].to_owned()),
-            Token::new_stat(18..19, segment[18..19].to_owned()),
-            Token::new_var(19..segment.len(), segment[19..segment.len()].to_owned()),
+            Token::new_var(0..8, "{author}".to_owned()),
+            Token::new_stat(8..9, ".".to_owned()),
+            Token::new_var(9..18, "{post_id}".to_owned()),
+            Token::new_stat(18..19, ".".to_owned()),
+            Token::new_var(19..segment.len(), "{slug}".to_owned()),
         ];
-        cmp_token_arr(expect, SegmentTokenizer::new(segment).tokenize(), get_line!())
+        cmp_token_arr(
+            expect,
+            SegmentTokenizer::new(segment).tokenize(),
+            get_line!(),
+        )
     }
 
     fn cmp_tokens(a: Token, b: Token, calling_line: String) -> Result<(), String> {

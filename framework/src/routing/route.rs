@@ -209,13 +209,6 @@ fn process_segments(segments: Vec<String>) -> Vec<RouteSegment> {
         .into_iter()
         .map(|seg| RouteSegment::new(seg))
         .collect()
-    // let mut result = Vec::new();
-    //
-    // for segment in segments.into_iter() {
-    //     result.push(RouteSegment::new(segment));
-    // }
-    //
-    // result
 }
 
 #[cfg(test)]
@@ -252,13 +245,19 @@ mod tests {
         );
 
         // Variable testing
-        router.get("/user/index".to_string(), GenericAction("Show user index page"));
+        router.get(
+            "/user/index".to_string(),
+            GenericAction("Show user index page"),
+        );
         router.get("/user/{user}".to_string(), GenericAction("Show user page"));
         router.get(
             "/user/{user}/details".to_string(),
             GenericAction("Show user details page"),
         );
-        router.get("/user/{user}/edit".to_string(), GenericAction("Show user edit page"));
+        router.get(
+            "/user/{user}/edit".to_string(),
+            GenericAction("Show user edit page"),
+        );
         router.get(
             "/user/{user}/posts/featured".to_string(),
             GenericAction("Show user posts page"),
