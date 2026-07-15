@@ -1,9 +1,13 @@
+use crate::error::HttpError;
+use crate::routing::router::Router;
 use futures::FutureExt;
 use http_body_util::Full;
 use hyper::body::{Bytes, Incoming};
 use hyper::rt::Executor;
 use hyper::service::service_fn;
 use hyper::{Request, Response};
+use hyper_util::rt::TokioIo;
+use hyper_util::server::conn::auto;
 use minijinja::Environment;
 use sea_orm::DatabaseConnection;
 use serde_json::json;
@@ -12,11 +16,7 @@ use std::fmt::Debug;
 use std::net::SocketAddr;
 use std::panic::AssertUnwindSafe;
 use std::sync::Arc;
-use hyper_util::rt::TokioIo;
-use hyper_util::server::conn::auto;
 use tokio::net::TcpListener;
-use crate::error::HttpError;
-use crate::routing::router::Router;
 
 #[derive(Debug)]
 pub struct Env {
@@ -91,6 +91,31 @@ impl App {
             }
         }
     }
+
+    fn error(&self, error: &HttpError, json: bool) -> Result<Response<Full<Bytes>>, HttpError> {
+        let mut builder = Response::builder().status(error.code());
+
+        // todo check if error templates available, if so, return the error template
+        // todo check if app is local/debug is enabled, send stack trace to browser if so
+
+        let content = if json {
+            builder = builder.header("Content-Type", "application/json");
+            json!({
+                "code": error.code(),
+                "message": error.message(),
+            })
+            .to_string()
+        } else {
+            self.template
+                .get_template("errors/default.html")
+                .unwrap()
+                // todo WARNING: be careful what we send to client here.
+                .render(error)
+                .unwrap()
+        };
+
+        Ok(builder.body(Full::new(Bytes::from(content))).unwrap())
+    }
 }
 
 /// Future executor that utilises `tokio` threads.
@@ -146,21 +171,17 @@ async fn handle_request(
         None
     };
 
-    // attempting to catch panics within app.dispatch()
+    // Catch panics within app.dispatch()
     match AssertUnwindSafe(app.dispatch(request)).catch_unwind().await {
         Ok(option) => {
             match option {
                 Some(result) => {
                     if let Err(err) = &result {
                         if wants_json.unwrap_or(false) {
-                            let json = json!({
-                                "code": err.code(),
-                                "message": err.message(),
-                            });
-                            return error_response(err.code(), json.to_string(), true);
+                            return app.error(err, true);
                         }
 
-                        return error_response(err.code(), err.message(), false);
+                        return app.error(err, false);
                     }
 
                     result
@@ -169,14 +190,11 @@ async fn handle_request(
                     // if response wants JSON or is api route, return JSON
                     // else, check config for error templates, return that
                     if wants_json.unwrap_or(false) {
-                        let json = json!({
-                            "code": 404,
-                            "message": "Endpoint not found."
-                        });
-                        return error_response(404, json.to_string(), true);
+                        return app
+                            .error(&HttpError::new(404, "Endpoint not found.".to_owned()), true);
                     }
 
-                    error_response(404, "Page not found.".to_string(), false)
+                    app.error(&HttpError::new(404, "Page not found.".to_owned()), false)
                 }
             }
         }
@@ -194,23 +212,7 @@ async fn handle_request(
                 "Something went wrong."
             };
 
-            error_response(500, msg.to_string(), false)
+            app.error(&HttpError::new(500, msg.to_string()), false)
         }
     }
-}
-
-fn error_response(
-    code: u16,
-    message: String,
-    json: bool,
-) -> Result<Response<Full<Bytes>>, HttpError> {
-    let mut builder = Response::builder().status(code);
-
-    if json {
-        builder = builder.header("Content-Type", "application/json");
-    }
-    // todo check if error templates available, if so, return the error template
-    // todo check if app is local/debug is enabled, send stack trace to browser if so
-
-    Ok(builder.body(Full::new(Bytes::from(message))).unwrap())
 }

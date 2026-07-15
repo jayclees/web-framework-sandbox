@@ -1,13 +1,14 @@
 use chrono::{DateTime, Utc};
 use regex::Regex;
+use serde::Serialize;
 use std::backtrace::Backtrace;
 use std::cell::RefCell;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
-use std::{fmt, fs};
 use std::path::PathBuf;
+use std::{fmt, fs};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct HttpError {
     code: u16,
     message: String,
