@@ -15,8 +15,8 @@ pub fn register_routes(router: &mut Router) -> () {
     // router.get("/user/{user}/post/{post}", ShowUser);
     router.get("/error", ShowErrorPage);
     router.getm(
-        "/home/app-{wildcard}",
+        "/home/app-{trailing_token}",
         ServeApp,
-        |route| route.constrain("wildcard", "asdf"),
-    );
+        |route| route.constrain("trailing_token", "[a-zA-Z-]+"),
+   );
 }

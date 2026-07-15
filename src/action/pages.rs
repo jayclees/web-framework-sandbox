@@ -183,6 +183,6 @@ impl Action for ServeApp {
         _app: &App,
         _request: Request<Incoming>,
     ) -> Result<Box<dyn Responsable>, HttpError> {
-        Ok(Box::new("good".to_string()))
+        Ok(Box::new("wildcard route hit".to_string()))
     }
 }
