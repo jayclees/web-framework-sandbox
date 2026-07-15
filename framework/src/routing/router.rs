@@ -21,11 +21,11 @@ impl Router {
     pub fn add<A: Action + 'static>(
         &mut self,
         method: Method,
-        path: String,
+        path: &str,
         action: A,
         modifier: Option<fn(Route) -> Route>,
     ) -> &mut Router {
-        let mut route = Route::new(method, path, action);
+        let mut route = Route::new(method, path.to_owned(), action);
 
         if let Some(modifier) = modifier {
             route = modifier(route);
@@ -38,7 +38,7 @@ impl Router {
 
     pub fn get<A: Action + 'static>(
         &mut self,
-        path: String,
+        path: &str,
         action: A,
     ) -> &mut Router {
         self.add(Method::GET, path, action, None);
@@ -48,7 +48,7 @@ impl Router {
 
     pub fn getm<A: Action + 'static>(
         &mut self,
-        path: String,
+        path: &str,
         action: A,
         modifier: fn(Route) -> Route,
     ) -> &mut Router {
@@ -59,7 +59,7 @@ impl Router {
 
     pub fn post<A: Action + 'static>(
         &mut self,
-        path: String,
+        path: &str,
         action: A,
         modifier: Option<fn(Route) -> Route>,
     ) -> &mut Router {
@@ -70,7 +70,7 @@ impl Router {
 
     pub fn patch<A: Action + 'static>(
         &mut self,
-        path: String,
+        path: &str,
         action: A,
         modifier: Option<fn(Route) -> Route>,
     ) -> &mut Router {
@@ -81,7 +81,7 @@ impl Router {
 
     pub fn put<A: Action + 'static>(
         &mut self,
-        path: String,
+        path: &str,
         action: A,
         modifier: Option<fn(Route) -> Route>,
     ) -> &mut Router {
@@ -92,7 +92,7 @@ impl Router {
 
     pub fn delete<A: Action + 'static>(
         &mut self,
-        path: String,
+        path: &str,
         action: A,
         modifier: Option<fn(Route) -> Route>,
     ) -> &mut Router {
@@ -103,7 +103,7 @@ impl Router {
 
     pub fn head<A: Action + 'static>(
         &mut self,
-        path: String,
+        path: &str,
         action: A,
         modifier: Option<fn(Route) -> Route>,
     ) -> &mut Router {
@@ -114,7 +114,7 @@ impl Router {
 
     pub fn connect<A: Action + 'static>(
         &mut self,
-        path: String,
+        path: &str,
         action: A,
         modifier: Option<fn(Route) -> Route>,
     ) -> &mut Router {
@@ -125,7 +125,7 @@ impl Router {
 
     pub fn options<A: Action + 'static>(
         &mut self,
-        path: String,
+        path: &str,
         action: A,
         modifier: Option<fn(Route) -> Route>,
     ) -> &mut Router {
@@ -136,7 +136,7 @@ impl Router {
 
     pub fn trace<A: Action + 'static>(
         &mut self,
-        path: String,
+        path: &str,
         action: A,
         modifier: Option<fn(Route) -> Route>,
     ) -> &mut Router {

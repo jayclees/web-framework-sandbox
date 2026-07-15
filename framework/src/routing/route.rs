@@ -36,8 +36,8 @@ impl Route {
         &self.action
     }
 
-    pub fn name(mut self, name: String) -> Route {
-        self.name = Some(name);
+    pub fn name(mut self, name: &str) -> Route {
+        self.name = Some(name.to_owned());
         self
     }
 
@@ -79,112 +79,114 @@ impl Route {
         let req_segs = split_segments(path.to_owned());
         let rou_segs = &self.segments;
 
-        return cmp(req_segs, rou_segs, 0);
+        Self::cmp(req_segs, rou_segs, 0)
+    }
 
-        fn cmp(req_segs: Vec<String>, rou_segs: &Vec<RouteSegment>, depth: usize) -> bool {
-            let req_seg = req_segs.iter().nth(depth);
-            let rou_seg = rou_segs.iter().nth(depth);
+    fn cmp(req_segs: Vec<String>, rou_segs: &Vec<RouteSegment>, depth: usize) -> bool {
+        let req_seg = req_segs.iter().nth(depth);
+        let rou_seg = rou_segs.iter().nth(depth);
 
-            // Recursive checks reached all the way to the end without failing, and both
-            // ended at the same depth. This means we've found a match. Return true.
-            if let None = req_seg
-                && let None = rou_seg
-            {
-                return true;
-            }
-
-            // One ran out before the other. Segment counts do not match. Return false.
-            if let Some(_) = req_seg
-                && let None = rou_seg
-            {
-                return false;
-            }
-
-            // One ran out before the other. Segment counts do not match. Return false.
-            if let None = req_seg
-                && let Some(_) = rou_seg
-            {
-                return false;
-            }
-
-            if reconcile_segs(req_seg.unwrap(), rou_seg.unwrap().tokens.clone(), depth) {
-                return cmp(req_segs, rou_segs, depth + 1);
-            }
-
-            false
+        // Recursive checks reached all the way to the end without failing, and both
+        // ended at the same depth. This means we've found a match. Return true.
+        if let None = req_seg
+            && let None = rou_seg
+        {
+            return true;
         }
 
-        fn reconcile_segs(req_seg: &str, tokens: Vec<Token>, _depth: usize) -> bool {
-            let mut cursor = 0;
-            // if any of these checks fail, break out of loop and return false
-            for token in tokens {
-                let is_match = match token.constraint {
-                    Constraint::Static => {
-                        let slices_match = req_seg.len() >= token.range.end
-                            && &req_seg[token.range.clone()] == token.slice;
-                        if slices_match {
-                            cursor = token.range.end;
-                            true
-                        } else {
-                            false
-                        }
-                    }
-                    Constraint::Default => reconcile_regex(None, req_seg, &mut cursor),
-                    Constraint::Regex(regex) => reconcile_regex(Some(regex), req_seg, &mut cursor),
-                    Constraint::Wildcard => {
-                        // If cursor matches start range for token.range
-                        if cursor == token.range.start {
-                            // Wildcard token starts at correct position in
-                            // req_seg, return true for entire route
-                            return true;
-                        }
+        // One ran out before the other. Segment counts do not match. Return false.
+        if let Some(_) = req_seg
+            && let None = rou_seg
+        {
+            return false;
+        }
+
+        // One ran out before the other. Segment counts do not match. Return false.
+        if let None = req_seg
+            && let Some(_) = rou_seg
+        {
+            return false;
+        }
+
+        if Self::reconcile_segs(req_seg.unwrap(), rou_seg.unwrap().tokens.clone(), depth) {
+            return Self::cmp(req_segs, rou_segs, depth + 1);
+        }
+
+        false
+    }
+
+    fn reconcile_segs(req_seg: &str, tokens: Vec<Token>, _depth: usize) -> bool {
+        let mut cursor = 0;
+        // if any of these checks fail, break out of loop and return false
+        for token in tokens {
+            let is_match = match token.constraint {
+                Constraint::Static => {
+                    let slices_match = req_seg.len() >= token.range.end
+                        && &req_seg[token.range.clone()] == token.slice;
+                    if slices_match {
+                        cursor = token.range.end;
+                        true
+                    } else {
                         false
                     }
-                };
-
-                if !is_match {
-                    return false;
                 }
-
-                // There is remaining unreconciled characters after all checks
-                // todo test this
-                // if cursor != req_seg.len() {
-                //     return false;
-                // }
-            }
-
-            true
-        }
-
-        fn reconcile_regex(regex: Option<Regex>, req_seg: &str, cursor: &mut usize) -> bool {
-            // First check that the string slice being tested only contains
-            // the characters allowed in the regex constraint.
-            let is_match: bool;
-            if let Some(regex) = &regex {
-                is_match = regex.is_match_at(req_seg, *cursor);
-                if req_seg == "123abc" {
-                    dbg!(is_match, regex.as_str(), req_seg);
+                Constraint::Default => Self::reconcile_regex(None, req_seg, &mut cursor),
+                Constraint::Regex(regex) => {
+                    Self::reconcile_regex(Some(regex), req_seg, &mut cursor)
                 }
-            } else {
-                is_match = DEFAULT_VAR_PATTERN.is_match_at(req_seg, *cursor);
-            }
+                Constraint::Wildcard => {
+                    // If cursor matches start range for token.range
+                    if cursor == token.range.start {
+                        // Wildcard token starts at correct position in
+                        // req_seg, return true for entire route
+                        return true;
+                    }
+                    false
+                }
+            };
+
             if !is_match {
                 return false;
             }
 
-            let found: Option<Match>;
-            if let Some(regex) = regex {
-                found = regex.find_at(req_seg, *cursor);
-            } else {
-                found = DEFAULT_VAR_PATTERN.find_at(req_seg, *cursor);
-            }
+            // There is remaining unreconciled characters after all checks
+            // todo test this
+            // if cursor != req_seg.len() {
+            //     return false;
+            // }
+        }
 
-            if let None = found {
-                false
-            } else {
-                *cursor = found.unwrap().range().end;
-                true
+        true
+    }
+
+    fn reconcile_regex(regex: Option<Regex>, req_seg: &str, cursor: &mut usize) -> bool {
+        // First check that the string slice being tested only contains
+        // the characters allowed in the regex constraint.
+        let is_match: bool;
+        if let Some(regex) = &regex {
+            is_match = regex.is_match_at(req_seg, *cursor);
+            if req_seg == "123abc" {
+                dbg!(is_match, regex.as_str(), req_seg);
             }
+        } else {
+            is_match = DEFAULT_VAR_PATTERN.is_match_at(req_seg, *cursor);
+        }
+        if !is_match {
+            return false;
+        }
+
+        let found: Option<Match>;
+        if let Some(regex) = regex {
+            found = regex.find_at(req_seg, *cursor);
+        } else {
+            found = DEFAULT_VAR_PATTERN.find_at(req_seg, *cursor);
+        }
+
+        if let None = found {
+            false
+        } else {
+            *cursor = found.unwrap().range().end;
+            true
         }
     }
 }
@@ -227,51 +229,39 @@ mod tests {
     fn register_routes(router: &mut Router) {
         // Some of these routes are here to check that they are NOT
         // hit, so please don't remove any routes.
-        router.get("/".to_string(), GenericAction("Landing page"));
+        router.get("/", Generic("Landing page"));
 
-        router.get("/home".to_string(), GenericAction("Home page"));
-        router.get("/about".to_string(), GenericAction("About us page"));
+        router.get("/home", Generic("Home page"));
+        router.get("/about", Generic("About us page"));
 
-        router.get("/home/trending".to_string(), GenericAction("Trending page"));
-        router.get("/home/popular".to_string(), GenericAction("Popular page"));
+        router.get("/home/trending", Generic("Trending page"));
+        router.get("/home/popular", Generic("Popular page"));
 
+        router.get("/home/settings/profile", Generic("Profile settings page"));
         router.get(
-            "/home/settings/profile".to_string(),
-            GenericAction("Profile settings page"),
-        );
-        router.get(
-            "/home/settings/preferences".to_string(),
-            GenericAction("Preferences settings page"),
+            "/home/settings/preferences",
+            Generic("Preferences settings page"),
         );
 
         // Variable testing
+        router.get("/user/index", Generic("Show user index page"));
+        router.get("/user/{user}", Generic("Show user page"));
+        router.get("/user/{user}/details", Generic("Show user details page"));
+        router.get("/user/{user}/edit", Generic("Show user edit page"));
         router.get(
-            "/user/index".to_string(),
-            GenericAction("Show user index page"),
-        );
-        router.get("/user/{user}".to_string(), GenericAction("Show user page"));
-        router.get(
-            "/user/{user}/details".to_string(),
-            GenericAction("Show user details page"),
-        );
-        router.get(
-            "/user/{user}/edit".to_string(),
-            GenericAction("Show user edit page"),
-        );
-        router.get(
-            "/user/{user}/posts/featured".to_string(),
-            GenericAction("Show user posts page"),
+            "/user/{user}/posts/featured",
+            Generic("Show user posts page"),
         );
 
         // For constraint testing
         router.getm(
-            "/author/{name}".to_string(),
-            GenericAction("Get author by name (alpha chars)"),
+            "/author/{name}",
+            Generic("Get author by name (alpha chars)"),
             |route| route.constrain("name", "[a-zA-Z]+"),
         );
         router.getm(
-            "/author/{id}".to_string(),
-            GenericAction("Get author by id (numeric chars)"),
+            "/author/{id}",
+            Generic("Get author by id (numeric chars)"),
             |route| route.constrain("id", "[0-9]+"),
         );
     }
@@ -456,10 +446,10 @@ mod tests {
     }
 
     #[derive(Debug)]
-    struct GenericAction(&'static str);
+    struct Generic(&'static str);
 
     #[async_trait]
-    impl Action for GenericAction {
+    impl Action for Generic {
         async fn handle(
             &self,
             _app: &App,
