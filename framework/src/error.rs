@@ -5,6 +5,7 @@ use std::cell::RefCell;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::{fmt, fs};
+use std::path::PathBuf;
 
 #[derive(Debug, Clone)]
 pub struct HttpError {
@@ -39,7 +40,7 @@ thread_local! {
     static LAST_BACKTRACE: RefCell<Option<Backtrace>> = RefCell::new(None)
 }
 
-pub fn register_panic_hook() {
+pub fn register_panic_hook(root: PathBuf) {
     // Make sure pattern is in the top scope of this function so it's only compiled once.
     let pattern = Regex::new(r"\Aapp\.\d{10}.log\z").unwrap();
     let default = std::panic::take_hook();
@@ -48,10 +49,10 @@ pub fn register_panic_hook() {
             *backtrace.borrow_mut() = Some(Backtrace::force_capture());
 
             // todo use parent project root relative route
-            let mut paths = fs::read_dir("../../storage/logs")
+            let mut paths = fs::read_dir(root.join("storage/logs"))
                 .unwrap_or_else(|_| {
-                    fs::create_dir("../../storage/logs").expect("failed to create dir");
-                    fs::read_dir("../../storage/logs").unwrap()
+                    fs::create_dir(root.join("storage/logs")).expect("failed to create dir");
+                    fs::read_dir(root.join("storage/logs")).unwrap()
                 })
                 .map(|p| String::from(p.unwrap().file_name().to_str().unwrap()))
                 .filter(|n| pattern.is_match(n))
