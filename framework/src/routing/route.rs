@@ -146,7 +146,11 @@ impl<'a> SegmentReconciliator<'a> {
             return false;
         }
 
-        if self.reconcile_segs(req_seg.unwrap(), &rou_seg.unwrap()) {
+        let (reconciled, wildcard) = self.reconcile_segs(req_seg.unwrap(), &rou_seg.unwrap());
+
+        if wildcard {
+            return true;
+        } else if reconciled {
             self.depth += 1;
             return self.cmp();
         }
@@ -154,7 +158,7 @@ impl<'a> SegmentReconciliator<'a> {
         false
     }
 
-    fn reconcile_segs(&self, req_seg: &str, rou_seg: &RouteSegment) -> bool {
+    fn reconcile_segs(&self, req_seg: &str, rou_seg: &RouteSegment) -> (bool, bool) {
         let mut cursor = 0;
         let mut i = 0;
         let tok_len = rou_seg.tokens.len();
@@ -242,7 +246,7 @@ impl<'a> SegmentReconciliator<'a> {
                     };
 
                     if !is_match {
-                        return false;
+                        return (false, false);
                     }
 
                     true
@@ -252,21 +256,21 @@ impl<'a> SegmentReconciliator<'a> {
                     if cursor == token.range.start {
                         // Wildcard token starts at correct position in
                         // req_seg, return true for entire route
-                        return true;
+                        return (true, true);
                     }
                     false
                 }
             };
 
             if !is_match {
-                return false;
+                return (false, false);
             }
 
             i += 1;
         }
 
         // If cursor is less than req seg len, match was invalid
-        cursor == req_seg.len()
+        (cursor == req_seg.len(), false)
     }
 }
 
@@ -514,6 +518,17 @@ mod tests {
         assert_eq!("/home/{leading_var}-page", resolved.unwrap().path);
     }
 
+    #[test]
+    fn resolve_wildcard() {
+        let resolved = ROUTER
+            .resolve_inner("/app/my/custom/slug", &Method::GET)
+            .unwrap();
+        if let None = resolved {
+            assert!(false, "Route not resolved.");
+        }
+        assert_eq!("/app/{slug}", resolved.unwrap().path);
+    }
+
     fn register_routes(router: &mut Router) {
         // Some of these routes are here to check that they are NOT
         // hit, so please don't remove any routes.
@@ -567,6 +582,10 @@ mod tests {
             route.wildcard("slug", true)
         });
         router.getm("/app/{slug}", Generic, |route| route.wildcard("slug", true));
+
+        // Reminder: Don't put a root level wildcard like "/{slug}". In some tests we
+        // are expecting that no routes are resolved and a root level wildcard
+        // will ensure that no matter what, a route will be returned.
     }
 
     #[derive(Debug)]
