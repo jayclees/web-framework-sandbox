@@ -8,7 +8,7 @@ use hyper::service::service_fn;
 use hyper::{Request, Response};
 use hyper_util::rt::TokioIo;
 use hyper_util::server::conn::auto;
-use minijinja_autoreload::AutoReloader;
+use minijinja_autoreload::{AutoReloader, EnvironmentGuard};
 use sea_orm::DatabaseConnection;
 use serde_json::json;
 use std::error::Error;
@@ -60,8 +60,10 @@ impl App {
         &self.listener
     }
 
-    pub fn template(&self) -> &AutoReloader {
-        &self.template
+    pub fn template(&self) -> EnvironmentGuard {
+        self.template
+            .acquire_env()
+            .expect("Failed to resolve minijinja environment")
     }
 
     pub fn db(&self) -> Option<&DatabaseConnection> {
