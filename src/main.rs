@@ -25,7 +25,7 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     let router = Router::new(register_routes);
     let template_reloader = reloader();
     let db = db().await?;
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+    let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
     let app = App::new(router, addr, template_reloader, db).await;
     let app = Arc::new(app);
 

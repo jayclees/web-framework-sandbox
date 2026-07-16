@@ -1,12 +1,33 @@
 services:
 
-  db:
-    image: mysql
-    restart: always
+  node:
+    build:
+      context: ./docker/node
+      dockerfile: Dockerfile
+    user: "node"
+    working_dir: /home/node/app
     environment:
-      MYSQL_DATABASE: rusty
-      MYSQL_ROOT_PASSWORD: my_secret_password
-    hostname: db
-    container_name: db
-    domainname: db
-    # (this is just an example, not intended to be a production configuration)
+      - NODE_ENV=development
+    volumes:
+      - ./:/home/node/app
+    command:
+      - wget -qO- https://get.pnpm.io/install.sh | ENV="$HOME/.bashrc" SHELL="$(which bash)" bash -
+      - source /home/node/.bashrc
+
+  nginx:
+    build:
+      context: ./docker/nginx
+      dockerfile: Dockerfile
+    volumes:
+      - ./public:/var/www/public
+
+#  db:
+#    image: mysql
+#    restart: always
+#    environment:
+#      MYSQL_DATABASE: rusty
+#      MYSQL_ROOT_PASSWORD: my_secret_password
+#    hostname: db
+#    container_name: db
+#    domainname: db
+#    # (this is just an example, not intended to be a production configuration)
