@@ -1,10 +1,9 @@
 [package]
-name = "bus_pattern_framework"
+name = "app"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-framework = { path = "framework" }
 hyper = "1"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 async-trait = "0.1.89"
@@ -18,7 +17,8 @@ sea-orm = {
 dotenvy = "0.15.7"
 log = "0.4.33"
 minijinja-autoreload = "2.21.0"
+sturdy = "0.1.0"
 
 [workspace]
 resolver = "3"
-members = [".", "framework", "migration"]
+members = [".", "migration"]
