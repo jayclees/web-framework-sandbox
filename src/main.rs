@@ -19,7 +19,6 @@ struct AppState {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
-    // todo try map_err
     let root = PathBuf::from(env::var("CARGO_MANIFEST_DIR")?);
     register_panic_hook(root.clone());
 
@@ -28,7 +27,6 @@ async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
     let state = AppState {};
     let router = Router::new(register_routes);
     let addr = format!("{host}:{port}");
-    // let app = App::init(router, addr, Box::new(state)).await;
 
     let app = Builder::new(root)
         .listen(addr)
