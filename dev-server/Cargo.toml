@@ -1,0 +1,14 @@
+[package]
+name = "dev-server"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+dns-lookup = "3.0.1"
+tokio = "1.52.3"
+watchexec = "8.2.0"
+watchexec-events = "6.1.0"
+watchexec-signals = "5.0.1"
+watchexec-supervisor = "5.2.0"
+notify-types = "2.1.0"
+notify = "8.2.0"
