@@ -1,25 +1,44 @@
 services:
 
+  app:
+    build:
+      context: ./docker/app
+      dockerfile: Dockerfile
+    # temporary to keep container running
+    command: tail -f Cargo.toml
+    working_dir: /home/www/app
+    volumes:
+      - ./:/home/www/app
+    environment:
+      VITE_HOST: node
+      VITE_PORT: 5173
+    ports:
+      - "3000:3000"
+
   node:
     build:
       context: ./docker/node
       dockerfile: Dockerfile
-    user: "node"
+#    command: /bin/bash -c "source /home/node/.bashrc" && /bin/bash -c "pn install" && ./node_modules/.bin/vite --host=0.0.0.0
+    command: ./node_modules/.bin/vite --host=0.0.0.0
+    user: node
     working_dir: /home/node/app
     environment:
-      - NODE_ENV=development
+      NODE_ENV: development
+      IS_DOCKER: 1
     volumes:
       - ./:/home/node/app
-    command:
-      - wget -qO- https://get.pnpm.io/install.sh | ENV="$HOME/.bashrc" SHELL="$(which bash)" bash -
-      - source /home/node/.bashrc
 
   nginx:
     build:
       context: ./docker/nginx
       dockerfile: Dockerfile
     volumes:
+      - ./docker/nginx/templates:/etc/nginx/templates
       - ./public:/var/www/public
+    environment:
+      APP_HOST: app
+      APP_PORT: 3000
 
 #  db:
 #    image: mysql
