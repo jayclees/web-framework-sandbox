@@ -13,8 +13,8 @@ sea-orm = {
     features = ["sqlx-sqlite", "runtime-tokio-native-tls", "macros", "entity-registry", "schema-sync"]
 }
 dotenvy = "0.15.7"
-sturdy = "0.1.0"
+sturdy = { path = "framework" }
 
 [workspace]
 resolver = "3"
-members = [".", "migration"]
+members = [".", "migration", "dev-server"]

@@ -7,13 +7,11 @@ use std::env;
 use std::error::Error;
 use std::path::PathBuf;
 use std::sync::Arc;
-use sturdy::app::{App, Env};
-use sturdy::cli::process_args;
-use sturdy::database::db;
+use sturdy::app::App;
+use sturdy::app::builder::Builder;
+use sturdy::cli::resolve_addr;
 use sturdy::error::register_panic_hook;
 use sturdy::routing::router::Router;
-use sturdy::support::logger::Logger;
-use sturdy::template::reloader;
 
 struct AppState {
     //
@@ -21,23 +19,25 @@ struct AppState {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
-    dotenvy::dotenv()?;
+    // todo try map_err
     let root = PathBuf::from(env::var("CARGO_MANIFEST_DIR")?);
-    let logger = Logger::new(root.clone());
-    register_panic_hook(logger.clone());
+    register_panic_hook(root.clone());
 
-    let (host, port, vite_url) = process_args();
+    // You may set this using `cargo run -- --host=0.0.0.0 --port=8080`
+    let (host, port) = resolve_addr();
     let state = AppState {};
-    let app = App::new(
-        Router::new(register_routes),
-        format!("{host}:{port}"),
-        reloader(root.clone()),
-        db().await?,
-        logger,
-        Env::new(env::var("APP_ENV")?, true, Some(vite_url)),
-        Box::new(state),
-    )
-    .await;
+    let router = Router::new(register_routes);
+    let addr = format!("{host}:{port}");
+    // let app = App::init(router, addr, Box::new(state)).await;
+
+    let app = Builder::new(root)
+        .listen(addr)
+        .router(router)
+        .template()
+        .db()
+        .state(Box::new(state))
+        .build()
+        .await;
 
     sturdy::app::run(Arc::new(app)).await
 }
