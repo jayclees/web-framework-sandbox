@@ -4,10 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-hyper = "1"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 async-trait = "0.1.89"
-serde_json = "1.0.150"
 minijinja = "2.21.0"
 serde = { version = "1.0.228", features = ["derive"] }
 sea-orm = {
@@ -15,8 +13,6 @@ sea-orm = {
     features = ["sqlx-sqlite", "runtime-tokio-native-tls", "macros", "entity-registry", "schema-sync"]
 }
 dotenvy = "0.15.7"
-log = "0.4.33"
-minijinja-autoreload = "2.21.0"
 sturdy = "0.1.0"
 
 [workspace]

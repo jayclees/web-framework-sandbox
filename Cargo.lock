@@ -113,13 +113,9 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "dotenvy",
- "hyper",
- "log",
  "minijinja",
- "minijinja-autoreload",
  "sea-orm",
  "serde",
- "serde_json",
  "sturdy",
  "tokio",
 ]
